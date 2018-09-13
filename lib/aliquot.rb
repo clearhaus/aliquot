@@ -9,8 +9,8 @@ require 'aliquot/validator'
 
 module Aliquot
   class ExpiredException < StandardError; end
-  class InvalidTokenException < StandardError; end
   class InvalidException < StandardError; end
+
   class Payment
     include R2D2::Util
 
@@ -35,7 +35,7 @@ module Aliquot
     def process
       @token = JSON.parse(@token_string)
 
-      validate_token(Aliquot::Validator::Token, @token)
+      validate(Aliquot::Validator::Token, @token)
 
       # Use R2D2 to verify the token.
       token = R2D2.build_token(@token,
@@ -43,11 +43,11 @@ module Aliquot
                                verification_keys: JSON.parse(GoogleKeyUpdater.update_keys))
 
       @signed_message = JSON.parse(token.signed_message)
-      validate_token(Aliquot::Validator::SignedMessage, @signed_message)
+      validate(Aliquot::Validator::SignedMessage, @signed_message)
 
       decrypt
 
-      validate_token(Aliquot::Validator::EncryptedMessageValidator, @message)
+      validate(Aliquot::Validator::EncryptedMessageValidator, @message)
 
       raise ExpiredException if expired?
 
@@ -58,12 +58,12 @@ module Aliquot
       @message['messageExpiration'].to_f / 1000.0 <= Time.now.to_f
     end
 
-    def validate_token(klass, data)
+    private
+
+    def validate(klass, data)
       validator = klass.new(data)
       throw InvalidException.new(validator.errors) unless validator.valid?
     end
-
-    private
 
     def decrypt
       hkdf_keys = derive_hkdf_keys(@signed_message['ephemeralPublicKey'], Base64.decode64(@shared_secret), 'Google')
