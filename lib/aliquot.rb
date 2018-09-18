@@ -9,7 +9,6 @@ require 'aliquot/validator'
 
 module Aliquot
   class ExpiredException < StandardError; end
-  class InvalidException < StandardError; end
 
   class Payment
     include R2D2::Util
@@ -37,21 +36,18 @@ module Aliquot
 
       validate(Aliquot::Validator::Token, @token)
 
-      # Use R2D2 to verify the token.
-      token = R2D2.build_token(@token,
-                               recipient_id: @recipient_id,
-                               verification_keys: JSON.parse(GoogleKeyUpdater.update_keys))
+      token = build_token(@token, @recipient_id, JSON.parse(GoogleKeyUpdater.update_keys))
 
       @signed_message = JSON.parse(token.signed_message)
       validate(Aliquot::Validator::SignedMessage, @signed_message)
 
-      decrypt
+      @message = decrypt
 
       validate(Aliquot::Validator::EncryptedMessageValidator, @message)
 
       raise ExpiredException if expired?
 
-      puts(@message)
+      @message
     end
 
     def expired?
@@ -62,15 +58,22 @@ module Aliquot
 
     def validate(klass, data)
       validator = klass.new(data)
-      throw InvalidException.new(validator.errors) unless validator.valid?
+      validator.validate
     end
 
     def decrypt
       hkdf_keys = derive_hkdf_keys(@signed_message['ephemeralPublicKey'], Base64.decode64(@shared_secret), 'Google')
       verify_mac(hkdf_keys[:mac_key], @signed_message['encryptedMessage'], @signed_message['tag'])
-      @message = JSON.parse(
+      JSON.parse(
         decrypt_message(@signed_message['encryptedMessage'], hkdf_keys[:symmetric_encryption_key])
       )
+    end
+
+    def build_token(token, recipient, keys)
+      # Use R2D2 to verify the token.
+      R2D2.build_token(token,
+                       recipient_id: recipient,
+                       verification_keys: keys)
     end
   end
 end
