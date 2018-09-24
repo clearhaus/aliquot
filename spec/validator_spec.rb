@@ -24,8 +24,6 @@ describe Aliquot::Validator::TokenSchema do
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
-  let(:shared_secret) { extract_shared_secret(token, recipient) }
-
   subject do
     lambda do
       a = Aliquot::Payment.new(token_string, 'no_secret', 'no_id', 'no_key')
