@@ -1,33 +1,39 @@
-$LOAD_PATH.unshift File.dirname(__FILE__)
-
 require 'json'
-require 'r2d2'
+require 'base64'
 require 'pry'
+require 'hkdf'
 
 require 'aliquot/google_key_updater'
 require 'aliquot/validator'
 
 module Aliquot
-  class ExpiredException < StandardError; end
+  class Error < StandardError; end
+  class ExpiredException < Error; end
+  class InvalidSignatureError < Error; end
+  class InvalidMacError < Error; end
 
   class Payment
-    include R2D2::Util
-
     # Google Key updater.
     @@gku = nil
 
-    def initialize(token_string, shared_secret, recipient_id)
+    # Parameters:
+    # token_string::  Google Pay token
+    # shared_secret:: Base64 encoded shared secret
+    # merchant_id::   Google Pay merchant ID
+    # signing_keys::  Formatted list of signing keys used to sign token contents.
+    def initialize(token_string, shared_secret, merchant_id, signing_keys)
+      @signing_keys = signing_keys
       # Start the Google Key Updater thread if we haven't.
       # A mutex should be added here to avoid multiple creations
-      if @@gku.nil?
-        # Provide the initial keys to avoid race issues.
-        #GoogleKeyUpdater.instance.keys = GoogleKeyUpdater.update_keys
-        GoogleKeyUpdater.update_keys
-        @@gku = Thread.new { GoogleKeyUpdater.updater }
-      end
+      #if @@gku.nil?
+      #  # Provide the initial keys to avoid race issues.
+      #  #GoogleKeyUpdater.instance.keys = GoogleKeyUpdater.update_keys
+      #  GoogleKeyUpdater.update_keys
+      #  @@gku = Thread.new { GoogleKeyUpdater.updater }
+      #end
 
       @shared_secret = shared_secret
-      @recipient_id = recipient_id
+      @merchant_id = merchant_id
       @token_string = token_string
     end
 
@@ -36,12 +42,20 @@ module Aliquot
 
       validate(Aliquot::Validator::Token, @token)
 
-      token = build_token(@token, @recipient_id, JSON.parse(GoogleKeyUpdater.update_keys))
+      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'], @token['signature'])
 
-      @signed_message = JSON.parse(token.signed_message)
+      @signed_message = JSON.parse(@token['signedMessage'])
       validate(Aliquot::Validator::SignedMessage, @signed_message)
 
-      @message = decrypt
+      aes_key, mac_key = derive_keys(@signed_message['ephemeralPublicKey'],
+                                     @shared_secret,
+                                     'Google')
+
+      raise InvalidMacError unless valid_mac?(mac_key,
+                                              @signed_message['encryptedMessage'],
+                                              @signed_message['tag'])
+
+      @message = decrypt(aes_key, @signed_message['encryptedMessage'])
 
       validate(Aliquot::Validator::EncryptedMessageValidator, @message)
 
@@ -61,19 +75,52 @@ module Aliquot
       validator.validate
     end
 
-    def decrypt
-      hkdf_keys = derive_hkdf_keys(@signed_message['ephemeralPublicKey'], Base64.decode64(@shared_secret), 'Google')
-      verify_mac(hkdf_keys[:mac_key], @signed_message['encryptedMessage'], @signed_message['tag'])
-      JSON.parse(
-        decrypt_message(@signed_message['encryptedMessage'], hkdf_keys[:symmetric_encryption_key])
-      )
+    def derive_keys(ephemeral_public_key, shared_secret, info)
+      ikm = Base64.strict_decode64(ephemeral_public_key) +
+            Base64.strict_decode64(shared_secret)
+      hbytes = HKDF.new(ikm, algorithm: 'SHA256', info: info).next_bytes(32)
+
+      [hbytes[0..15], hbytes[16..32]]
     end
 
-    def build_token(token, recipient, keys)
-      # Use R2D2 to verify the token.
-      R2D2.build_token(token,
-                       recipient_id: recipient,
-                       verification_keys: keys)
+    def decrypt(key, encrypted)
+      c = OpenSSL::Cipher::AES128.new(:CTR)
+      c.key = key
+      c.decrypt
+      plain = c.update(Base64.strict_decode64(encrypted)) + c.final
+      JSON.parse(plain)
+    end
+
+    def valid_signature?(message, signature)
+      # Genereate the string that was signed.
+      signed_string = ['Google', @merchant_id, 'ECv1', message].map do |str|
+        [str.length].pack('V') + str
+      end.join
+
+      keys = JSON.parse(@signing_keys)['keys']
+      # Check if signature was performed with any possible signature.
+      keys.map do |e|
+        next if e['protocolVersion'] != 'ECv1'
+
+        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
+        d  = OpenSSL::Digest::SHA256.new
+        ec.verify(d, Base64.strict_decode64(signature), signed_string)
+      end.any?
+    end
+
+    def valid_mac?(mac_key, data, tag)
+      d = OpenSSL::Digest::SHA256.new
+      mac = OpenSSL::HMAC.digest(d, mac_key, Base64.strict_decode64(data))
+      mac = Base64.strict_encode64(mac)
+
+      return false if mac.length != tag.length
+
+      err = false
+      mac.each_byte.zip(tag.each_byte).each do |x, y|
+        err |= x != y
+      end
+
+      !err
     end
   end
 end
