@@ -12,6 +12,19 @@ module Aliquot
   class InvalidSignatureError < Error; end
   class InvalidMacError < Error; end
 
+  # Constant-time comparison function
+  def self.compare(a, b)
+    err = 0
+
+    y = b.unpack('C*')
+
+    a.each_byte do |x|
+      err |= x ^ y.shift
+    end
+
+    err.zero?
+  end
+
   class Payment
     # Google Key updater.
     @@gku = nil
@@ -42,7 +55,8 @@ module Aliquot
 
       validate(Aliquot::Validator::Token, @token)
 
-      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'], @token['signature'])
+      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'],
+                                                          @token['signature'])
 
       @signed_message = JSON.parse(@token['signedMessage'])
       validate(Aliquot::Validator::SignedMessage, @signed_message)
@@ -115,12 +129,7 @@ module Aliquot
 
       return false if mac.length != tag.length
 
-      err = false
-      mac.each_byte.zip(tag.each_byte).each do |x, y|
-        err |= x != y
-      end
-
-      !err
+      Aliquot.compare(mac, tag)
     end
   end
 end
