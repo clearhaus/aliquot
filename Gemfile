@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'dry-validation'
-gem 'fast_secure_compare'
+gem 'excon'
 gem 'hkdf'
 
 group :test do

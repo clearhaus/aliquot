@@ -26,7 +26,7 @@ describe Aliquot::Validator::TokenSchema do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', 'no_id', 'no_key')
+      a = Aliquot::Payment.new(token_string, 'no_secret', 'no_id', nil, 'no_key')
       a.process
     end
   end
@@ -58,7 +58,7 @@ describe Aliquot::Validator::TokenSchema do
       it "when message is '#{sig}'" do
         @payment = AliquotPay.payment
         token['signedMessage'] = sig
-        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, keystring)
+        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, nil, keystring)
 
         expect { a.process }.to raise_error(Aliquot::Validator::Error, msg)
       end
@@ -99,7 +99,7 @@ describe Aliquot::Validator::SignedMessageSchema do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, keystring)
+      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, nil, keystring)
       a.process
     end
   end
@@ -170,7 +170,7 @@ describe Aliquot::Validator::EncryptedMessage do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, keystring)
+      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
       a.process
     end
   end
@@ -240,7 +240,7 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, keystring)
+      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
       a.process
     end
   end

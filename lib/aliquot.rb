@@ -1,10 +1,13 @@
 require 'json'
 require 'base64'
-require 'pry'
+require 'excon'
 require 'hkdf'
 
 require 'aliquot/google_key_updater'
 require 'aliquot/validator'
+
+$key_updater_semaphore = Mutex.new
+$key_updater_thread = nil
 
 module Aliquot
   class Error < StandardError; end
@@ -25,6 +28,59 @@ module Aliquot
     err.zero?
   end
 
+  SIGNING_KEY_URL = 'https://payments.developers.google.com/paymentmethodtoken/keys.json'.freeze
+  TEST_SIGNING_KEY_URL = 'https://payments.developers.google.com/paymentmethodtoken/test/keys.json'.freeze
+
+  def self.start_key_updater(logger)
+    source = if ENV['ENVIRONMENT'] == 'production'
+               SIGNING_KEY_URL
+             else
+               TEST_SIGNING_KEY_URL
+             end
+
+    $key_updater_semaphore.synchronize do
+      break unless $key_updater_thread.nil?
+
+      new_thread = Thread.new do
+        loop do
+          begin
+            timeout = 0
+
+            conn = Excon.new(source)
+            resp = conn.get
+
+            raise 'Unable to update keys: ' + resp.data[:status_line] unless resp.status == 200
+            cache_control = resp.headers['Cache-Control'].split(/,\s*/)
+            h = cache_control.map { |x| /\Amax-age=(?<timeout>\d+)\z/ =~ x; timeout }.compact
+
+            timeout = h.first.to_i if h.length == 1
+            timeout = 86400 if timeout.nil? || !timeout.positive?
+
+            Thread.current.thread_variable_set('keys', resp.body)
+
+            # Supposedly recommendd by Tink library
+            sleep_time = timeout / 2
+
+            logger.info('Updated Google signing keys. Sleeping for: ' + (sleep_time / 86400.0).to_s + ' days')
+
+            sleep sleep_time
+          rescue Interrupt => e
+            # When interrupted
+            logger.fatal(e.message)
+            return
+          rescue => e
+            # Don't retry excessively.
+            logger.error('Exception updating Google signing keys: ' + e.message)
+            sleep 1
+          end
+        end
+      end
+
+      sleep 0.2 while new_thread.thread_variable_get('keys').nil?
+      $key_updater_thread = new_thread
+    end
+  end
+
   class Payment
     # Google Key updater.
     @@gku = nil
@@ -34,16 +90,9 @@ module Aliquot
     # shared_secret:: Base64 encoded shared secret
     # merchant_id::   Google Pay merchant ID
     # signing_keys::  Formatted list of signing keys used to sign token contents.
-    def initialize(token_string, shared_secret, merchant_id, signing_keys)
+    def initialize(token_string, shared_secret, merchant_id, logger = DummyLogger, signing_keys = nil)
+      Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
       @signing_keys = signing_keys
-      # Start the Google Key Updater thread if we haven't.
-      # A mutex should be added here to avoid multiple creations
-      #if @@gku.nil?
-      #  # Provide the initial keys to avoid race issues.
-      #  #GoogleKeyUpdater.instance.keys = GoogleKeyUpdater.update_keys
-      #  GoogleKeyUpdater.update_keys
-      #  @@gku = Thread.new { GoogleKeyUpdater.updater }
-      #end
 
       @shared_secret = shared_secret
       @merchant_id = merchant_id
@@ -52,7 +101,6 @@ module Aliquot
 
     def process
       @token = JSON.parse(@token_string)
-
       validate(Aliquot::Validator::Token, @token)
 
       raise InvalidSignatureError unless valid_signature?(@token['signedMessage'],
@@ -111,7 +159,7 @@ module Aliquot
         [str.length].pack('V') + str
       end.join
 
-      keys = JSON.parse(@signing_keys)['keys']
+      keys = JSON.parse(signing_keys)['keys']
       # Check if signature was performed with any possible signature.
       keys.map do |e|
         next if e['protocolVersion'] != 'ECv1'
@@ -130,6 +178,40 @@ module Aliquot
       return false if mac.length != tag.length
 
       Aliquot.compare(mac, tag)
+    end
+
+    def signing_keys
+      @signing_keys || $key_updater_thread.thread_variable_get('keys')
+    end
+  end
+
+  class DummyLogger
+    class << self
+      def debug(message, options = {})
+        print(message)
+      end
+
+      def info(message, options = {})
+        print(message)
+      end
+
+      def warning(message, options = {})
+        print(message)
+      end
+
+      def error(message, options = {})
+        print(message)
+      end
+
+      def fatal(message, options = {})
+        print(message)
+      end
+
+      private
+
+      def print(message)
+        puts(message)
+      end
     end
   end
 end
