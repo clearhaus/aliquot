@@ -94,7 +94,7 @@ module Aliquot
       optional(:cryptogram).filled(:str?)
       optional(:eciIndicator).filled(:str?, :eci?)
 
-      rule(authMethodCryptogram3DS: %i[authMethod cryptogram eciIndicator]) do |method, cryptogram, eci|
+      rule(authMethodCryptogram3DS: %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('CRYPTOGRAM_3DS') > cryptogram.filled?
       end
 

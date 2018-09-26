@@ -310,24 +310,24 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
     @payment = AliquotPay.payment(auth_method: :CRYPTOGRAM_3DS)
     @payment['paymentMethodDetails'].delete('eciIndicator')
     is_expected.to be_truthy
-    end
+  end
 
   it 'rejects ECI data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['eciIndicator'] = '05'
-    is_expected.to  raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
   end
 
   it 'rejects cryptogram data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['cryptogram'] = 'some cryptogram'
-    is_expected.to  raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
   end
 
   it 'rejects invalid ECI indicator' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['eciIndicator'] = 'not an ECI'
-    is_expected.to  raise_error(Aliquot::Validator::Error, /eciIndicator must be an ECI/)
+    is_expected.to raise_error(Aliquot::Validator::Error, /eciIndicator must be an ECI/)
   end
 
   it 'rejects invalid cryptogram' do

@@ -3,7 +3,6 @@ require 'base64'
 require 'excon'
 require 'hkdf'
 
-require 'aliquot/google_key_updater'
 require 'aliquot/validator'
 
 $key_updater_semaphore = Mutex.new
@@ -39,6 +38,7 @@ module Aliquot
              end
 
     $key_updater_semaphore.synchronize do
+      # Another thread might have been waiting for on the mutex
       break unless $key_updater_thread.nil?
 
       new_thread = Thread.new do
@@ -66,7 +66,7 @@ module Aliquot
             sleep sleep_time
           rescue Interrupt => e
             # When interrupted
-            logger.fatal(e.message)
+            logger.fatal('Quitting: ' + e.message)
             return
           rescue => e
             # Don't retry excessively.
@@ -77,19 +77,21 @@ module Aliquot
       end
 
       sleep 0.2 while new_thread.thread_variable_get('keys').nil?
+      # Body has now been set.
+      # Let other clients through.
       $key_updater_thread = new_thread
     end
   end
 
   class Payment
-    # Google Key updater.
-    @@gku = nil
-
     # Parameters:
-    # token_string::  Google Pay token
-    # shared_secret:: Base64 encoded shared secret
-    # merchant_id::   Google Pay merchant ID
+    # token_string::  Google Pay token (JSON string)
+    # shared_secret:: Base64 encoded shared secret (EC Public key)
+    # merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
+    # logger::        The logger to use, check DummyLogger for interface
     # signing_keys::  Formatted list of signing keys used to sign token contents.
+    #                 Otherwise a thread continuously updating google signing
+    #                 keys will be started.
     def initialize(token_string, shared_secret, merchant_id, logger = DummyLogger, signing_keys = nil)
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
       @signing_keys = signing_keys
@@ -102,6 +104,10 @@ module Aliquot
     def process
       @token = JSON.parse(@token_string)
       validate(Aliquot::Validator::Token, @token)
+
+      @protocol_version = @token['protocolVersion']
+
+      raise Error, 'only ECv1 protocolVersion is supported' unless @protocol_version == 'ECv1'
 
       raise InvalidSignatureError unless valid_signature?(@token['signedMessage'],
                                                           @token['signature'])
@@ -154,15 +160,15 @@ module Aliquot
     end
 
     def valid_signature?(message, signature)
-      # Genereate the string that was signed.
-      signed_string = ['Google', @merchant_id, 'ECv1', message].map do |str|
+      # Generate the string that was signed.
+      signed_string = ['Google', @merchant_id, @protocol_version, message].map do |str|
         [str.length].pack('V') + str
       end.join
 
       keys = JSON.parse(signing_keys)['keys']
       # Check if signature was performed with any possible signature.
       keys.map do |e|
-        next if e['protocolVersion'] != 'ECv1'
+        next if e['protocolVersion'] != @protocol_version
 
         ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
         d  = OpenSSL::Digest::SHA256.new
@@ -187,23 +193,23 @@ module Aliquot
 
   class DummyLogger
     class << self
-      def debug(message, options = {})
+      def debug(message)
         print(message)
       end
 
-      def info(message, options = {})
+      def info(message)
         print(message)
       end
 
-      def warning(message, options = {})
+      def warning(message)
         print(message)
       end
 
-      def error(message, options = {})
+      def error(message)
         print(message)
       end
 
-      def fatal(message, options = {})
+      def fatal(message)
         print(message)
       end
 
