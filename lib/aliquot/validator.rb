@@ -136,7 +136,7 @@ module Aliquot
 
     class Token
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Validation::Error; end
       def initialize(input)
         @input = input
         @schema = TokenSchema
@@ -145,7 +145,7 @@ module Aliquot
 
     class SignedMessage
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Validation::Error; end
       def initialize(input)
         @input = input
         @schema = SignedMessageSchema
@@ -154,7 +154,7 @@ module Aliquot
 
     class EncryptedMessageValidator
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Validation::Error; end
       def initialize(input)
         @input = input
         @schema = EncryptedMessageSchema
