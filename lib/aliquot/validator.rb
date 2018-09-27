@@ -77,7 +77,7 @@ module Aliquot
     end
 
     PaymentMethodDetails = Dry::Validation.Schema(BaseSchema) do
-      required(:pan).filled(:pan?)
+      required(:pan).filled(:integer_string?, :pan?)
       required(:expirationMonth).filled(:int?, :month?)
       required(:expirationYear).filled(:int?, :year?)
       required(:authMethod).filled(:str?, included_in?: %w[PAN_ONLY CRYPTOGRAM_3DS])
