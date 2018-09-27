@@ -20,9 +20,6 @@ module Aliquot
         integer_string?:  'must be string encoded integer',
         month?:           'must be a month (1..12)',
         year?:            'must be a year (2000..3000)',
-
-        authMethodCryptogram3DS: 'authMethod CRYPTOGRAM_3DS requires eciIndicator',
-        authMethodCard:          'eciIndicator/cryptogram must be omitted when PAN_ONLY',
       }.freeze
 
       # Support Ruby 2.3, but use the faster #match? when available.
@@ -85,12 +82,16 @@ module Aliquot
       optional(:cryptogram).filled(:str?)
       optional(:eciIndicator).filled(:str?, :eci?)
 
-      rule(authMethodCryptogram3DS: %i[authMethod cryptogram]) do |method, cryptogram|
+      rule('when authMethod is CRYPTOGRAM_3DS, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('CRYPTOGRAM_3DS') > cryptogram.filled?
       end
 
-      rule(authMethodCard: %i[authMethod cryptogram eciIndicator]) do |method, cryptogram, eci|
-        method.eql?('PAN_ONLY') > cryptogram.none? & eci.none?
+      rule('when authMethod is PAN_ONLY, cryptogram': %i[authMethod cryptogram ]) do |method, cryptogram|
+        method.eql?('PAN_ONLY') > cryptogram.none?
+      end
+
+      rule('when authMethod is PAN_ONLY, eciIndicator': %i[authMethod eciIndicator]) do |method, eci|
+        method.eql?('PAN_ONLY') > eci.none?
       end
     end
 
