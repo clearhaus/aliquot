@@ -3,24 +3,6 @@ require 'aliquot'
 require 'spec_helper'
 
 describe Aliquot::Validator::TokenSchema do
-  let(:recipient) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:merchant_id) { AliquotPay::DEFAULTS[:merchant_id] }
-
-  # Trusted key used for signing.
-  let(:key) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:keystring) do
-    public_key = OpenSSL::PKey::EC.new(key.group)
-    public_key.public_key = key.public_key
-    JSON.unparse(
-      'keys' => [
-        {
-          'keyValue'        => Base64.strict_encode64(public_key.to_der),
-          'protocolVersion' => 'ECv1',
-        },
-      ]
-    )
-  end
-
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
@@ -67,24 +49,6 @@ describe Aliquot::Validator::TokenSchema do
 end
 
 describe Aliquot::Validator::SignedMessageSchema do
-  let(:recipient) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:merchant_id) { AliquotPay::DEFAULTS[:merchant_id] }
-
-  # Trusted key used for signing.
-  let(:key) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:keystring) do
-    public_key = OpenSSL::PKey::EC.new(key.group)
-    public_key.public_key = key.public_key
-    JSON.unparse(
-      'keys' => [
-        {
-          'keyValue'        => Base64.strict_encode64(public_key.to_der),
-          'protocolVersion' => 'ECv1',
-        },
-      ]
-    )
-  end
-
   # The message we are generating.
   let(:message) do
     {
@@ -145,24 +109,6 @@ describe Aliquot::Validator::SignedMessageSchema do
 end
 
 describe Aliquot::Validator::EncryptedMessage do
-  let(:recipient) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:merchant_id) { AliquotPay::DEFAULTS[:merchant_id] }
-
-  # Trusted key used for signing.
-  let(:key) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:keystring) do
-    public_key = OpenSSL::PKey::EC.new(key.group)
-    public_key.public_key = key.public_key
-    JSON.unparse(
-      'keys' => [
-        {
-          'keyValue'        => Base64.strict_encode64(public_key.to_der),
-          'protocolVersion' => 'ECv1',
-        },
-      ]
-    )
-  end
-
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
@@ -215,24 +161,6 @@ describe Aliquot::Validator::EncryptedMessage do
 end
 
 describe Aliquot::Validator::PaymentMethodDetails, n: true do
-  let(:recipient) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:merchant_id) { AliquotPay::DEFAULTS[:merchant_id] }
-
-  # Trusted key used for signing.
-  let(:key) { OpenSSL::PKey::EC.new('prime256v1').generate_key }
-  let(:keystring) do
-    public_key = OpenSSL::PKey::EC.new(key.group)
-    public_key.public_key = key.public_key
-    JSON.unparse(
-      'keys' => [
-        {
-          'keyValue'        => Base64.strict_encode64(public_key.to_der),
-          'protocolVersion' => 'ECv1',
-        },
-      ]
-    )
-  end
-
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
