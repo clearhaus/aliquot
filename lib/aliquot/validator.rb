@@ -95,7 +95,7 @@ module Aliquot
     end
 
     EncryptedMessage = Dry::Validation.Schema(BaseSchema) do
-      required(:messageExpiration).filled(:str?, :intstring?)
+      required(:messageExpiration).filled(:str?, :integer_string?)
       required(:messageId).filled(:str?)
       required(:paymentMethod).filled(:str?, eql?: 'CARD')
       required(:paymentMethodDetails).schema(PaymentMethodDetails)
