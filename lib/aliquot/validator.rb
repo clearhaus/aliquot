@@ -63,7 +63,7 @@ module Aliquot
 
     TokenSchema = Dry::Validation.Schema(BaseSchema) do
       required(:signature).filled(:str?, :base64?)
-      required(:protocolVersion).filled(:str?, included_in?: %w[ECv1])
+      required(:protocolVersion).filled(:str?, eql?: 'ECv1')
       required(:signedMessage).filled(:str?, :json_string?)
     end
 
