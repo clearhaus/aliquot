@@ -50,7 +50,7 @@ module Aliquot
             resp = conn.get
 
             raise 'Unable to update keys: ' + resp.data[:status_line] unless resp.status == 200
-            cache_control = resp.headers['Cache-Control'].split(/,\s*/)
+            cache_control = resp.headers['Cache-Control'].to_s.split(/,\s*/)
             h = cache_control.map { |x| /\Amax-age=(?<timeout>\d+)\z/ =~ x; timeout }.compact
 
             timeout = h.first.to_i if h.length == 1
