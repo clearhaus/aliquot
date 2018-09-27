@@ -16,8 +16,8 @@ module Aliquot
         pan?:             'must be a pan',
         ec_public_key?:   'must be an EC public key',
         eci?:             'must be an ECI',
-        jsonstring?:      'must be valid JSON',
-        intstring?:       'must be string encoded integer',
+        json_string?:     'must be valid JSON',
+        integer_string?:  'must be string encoded integer',
         month?:           'must be a month (1..12)',
         year?:            'must be a year (2000..3000)',
 
@@ -46,9 +46,9 @@ module Aliquot
 
       predicate(:ec_public_key?) { |x| base64?(x) && OpenSSL::PKey::EC.new(Base64.decode64(x)).check_key rescue false }
 
-      predicate(:jsonstring?) { |x| !!JSON.parse(x) rescue false }
+      predicate(:json_string?) { |x| !!JSON.parse(x) rescue false }
 
-      predicate(:intstring?) { |x| match_b.call(x, /\A\d+\z/) }
+      predicate(:integer_string?) { |x| match_b.call(x, /\A\d+\z/) }
 
       predicate(:month?) { |x| x >= 1 && x <= 12 }
 
@@ -66,9 +66,8 @@ module Aliquot
 
     TokenSchema = Dry::Validation.Schema(BaseSchema) do
       required(:signature).filled(:str?, :base64?)
-
       required(:protocolVersion).filled(:str?, included_in?: %w[ECv1])
-      required(:signedMessage).filled(:str?, :jsonstring?)
+      required(:signedMessage).filled(:str?, :json_string?)
     end
 
     SignedMessageSchema = Dry::Validation.Schema(BaseSchema) do
