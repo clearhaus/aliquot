@@ -9,4 +9,12 @@ Gem::Specification.new do |s|
   s.summary  = 'To validate Google Pay tokens'
 
   s.files = Dir.glob('lib/**/*.rb')
+
+  s.add_runtime_dependency 'dry-validation'
+  s.add_runtime_dependency 'excon'
+  s.add_runtime_dependency 'hkdf'
+
+  s.add_development_dependency 'aliquot-pay'
+  s.add_development_dependency 'pry'
+  s.add_development_dependency 'rspec'
 end
