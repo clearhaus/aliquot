@@ -76,7 +76,7 @@ module Aliquot
       required(:tag).filled(:str?, :base64?)
     end
 
-    PaymentMethodDetails = Dry::Validation.Schema(BaseSchema) do
+    PaymentMethodDetailsSchema = Dry::Validation.Schema(BaseSchema) do
       required(:pan).filled(:integer_string?, :pan?)
       required(:expirationMonth).filled(:int?, :month?)
       required(:expirationYear).filled(:int?, :year?)
@@ -94,11 +94,11 @@ module Aliquot
       end
     end
 
-    EncryptedMessage = Dry::Validation.Schema(BaseSchema) do
+    EncryptedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:messageExpiration).filled(:str?, :integer_string?)
       required(:messageId).filled(:str?)
       required(:paymentMethod).filled(:str?, eql?: 'CARD')
-      required(:paymentMethodDetails).schema(PaymentMethodDetails)
+      required(:paymentMethodDetails).schema(PaymentMethodDetailsSchema)
     end
 
     module InstanceMethods
@@ -157,7 +157,7 @@ module Aliquot
       class Error < StandardError; end
       def initialize(input)
         @input = input
-        @schema = EncryptedMessage
+        @schema = EncryptedMessageSchema
       end
     end
   end
