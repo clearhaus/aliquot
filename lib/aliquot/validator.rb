@@ -47,7 +47,7 @@ module Aliquot
       # the above Base64? predicate and use the following simpler one:
       #predicate(:strict_base64?) { |x| !!Base64.strict_decode64(x) rescue false }
 
-      predicate(:pan?) { |x| str?(x) && match_b.call(x, /\A[1-9][0-9]{11,18}\z/) }
+      predicate(:pan?) { |x| str?(x) && match_b.call(x, /\A\d{12,19}\z/) }
 
       predicate(:eci?) { |x| str?(x) && match_b.call(x, /\A\d{1,2}\z/) }
 

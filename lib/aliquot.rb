@@ -50,7 +50,7 @@ module Aliquot
             resp = conn.get
 
             raise 'Unable to update keys: ' + resp.data[:status_line] unless resp.status == 200
-            cache_control = resp.headers['Cache-Control'].split(/,\s*/)
+            cache_control = resp.headers['Cache-Control'].to_s.split(/,\s*/)
             h = cache_control.map { |x| /\Amax-age=(?<timeout>\d+)\z/ =~ x; timeout }.compact
 
             timeout = h.first.to_i if h.length == 1
@@ -58,7 +58,7 @@ module Aliquot
 
             Thread.current.thread_variable_set('keys', resp.body)
 
-            # Supposedly recommendd by Tink library
+            # Supposedly recommended by Tink library
             sleep_time = timeout / 2
 
             logger.info('Updated Google signing keys. Sleeping for: ' + (sleep_time / 86400.0).to_s + ' days')
@@ -166,7 +166,7 @@ module Aliquot
       end.join
 
       keys = JSON.parse(signing_keys)['keys']
-      # Check if signature was performed with any possible signature.
+      # Check if signature was performed with any possible key.
       keys.map do |e|
         next if e['protocolVersion'] != @protocol_version
 

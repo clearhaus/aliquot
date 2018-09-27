@@ -160,7 +160,7 @@ describe Aliquot::Validator::EncryptedMessage do
   end
 end
 
-describe Aliquot::Validator::PaymentMethodDetails, n: true do
+describe Aliquot::Validator::PaymentMethodDetails do
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
