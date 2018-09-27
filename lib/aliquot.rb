@@ -58,7 +58,7 @@ module Aliquot
 
             Thread.current.thread_variable_set('keys', resp.body)
 
-            # Supposedly recommendd by Tink library
+            # Supposedly recommended by Tink library
             sleep_time = timeout / 2
 
             logger.info('Updated Google signing keys. Sleeping for: ' + (sleep_time / 86400.0).to_s + ' days')
