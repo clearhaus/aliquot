@@ -28,13 +28,6 @@ module Aliquot
       # Support Ruby 2.3, but use the faster #match? when available.
       match_b = ''.respond_to?(:match?) ? ->(s, re) { s.match?(re) } : ->(s, re) { !!(s =~ re) }
 
-      def self.to_bool(lbd)
-        lbd.call
-        true
-      rescue
-        false
-      end
-
       predicate(:base64?) do |x|
         str?(x) &&
           match_b.call(x, /\A[=A-Za-z0-9+\/]*\z/) && # allowable chars
@@ -53,7 +46,7 @@ module Aliquot
 
       predicate(:ec_public_key?) { |x| base64?(x) && OpenSSL::PKey::EC.new(Base64.decode64(x)).check_key rescue false }
 
-      predicate(:jsonstring?) { |x| to_bool -> { JSON.parse(x) } }
+      predicate(:jsonstring?) { |x| !!JSON.parse(x) rescue false }
 
       predicate(:intstring?) { |x| match_b.call(x, /\A\d+\z/) }
 
