@@ -45,7 +45,7 @@ module Aliquot
 
       predicate(:json_string?) { |x| !!JSON.parse(x) rescue false }
 
-      predicate(:integer_string?) { |x| match_b.call(x, /\A\d+\z/) }
+      predicate(:integer_string?) { |x| str?(x) && match_b.call(x, /\A\d+\z/) }
 
       predicate(:month?) { |x| x.between?(1, 12) }
 
