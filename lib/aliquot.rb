@@ -166,7 +166,7 @@ module Aliquot
       end.join
 
       keys = JSON.parse(signing_keys)['keys']
-      # Check if signature was performed with any possible signature.
+      # Check if signature was performed with any possible key.
       keys.map do |e|
         next if e['protocolVersion'] != @protocol_version
 
