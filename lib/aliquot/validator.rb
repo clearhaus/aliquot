@@ -50,9 +50,9 @@ module Aliquot
 
       predicate(:integer_string?) { |x| match_b.call(x, /\A\d+\z/) }
 
-      predicate(:month?) { |x| x >= 1 && x <= 12 }
+      predicate(:month?) { |x| x.between?(1, 12) }
 
-      predicate(:year?) { |x| x >= 2000 && x <= 3000 }
+      predicate(:year?) { |x| x.between?(2000, 3000) }
     end
 
     class Error < StandardError; end
