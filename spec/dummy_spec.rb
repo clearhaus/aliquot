@@ -15,7 +15,8 @@ describe Aliquot::Payment do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
+      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id,
+                               signing_keys: keystring)
       a.process
     end
   end
@@ -39,7 +40,8 @@ describe Aliquot::Payment do
 
   it 'it fails validation on invalid merchant_id' do
     @payment = AliquotPay.payment
-    a = Aliquot::Payment.new(token_string, shared_secret, 'incorrect', nil, keystring)
+    a = Aliquot::Payment.new(token_string, shared_secret, 'incorrect',
+                             signing_keys: keystring)
 
     expect { a.process }.to raise_error(Aliquot::InvalidSignatureError)
   end
@@ -48,7 +50,8 @@ describe Aliquot::Payment do
     @payment = AliquotPay.payment
     sig = AliquotPay.sign(key, OpenSSL::Random.random_bytes(256))
     token['signature'] = sig
-    a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
+    a = Aliquot::Payment.new(token_string, shared_secret, merchant_id,
+                             signing_keys: keystring)
 
     expect { a.process }.to raise_error(Aliquot::InvalidSignatureError)
   end

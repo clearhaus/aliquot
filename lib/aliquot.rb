@@ -4,16 +4,12 @@ require 'excon'
 require 'hkdf'
 
 require 'aliquot/validator'
+require 'aliquot/error'
 
 $key_updater_semaphore = Mutex.new
 $key_updater_thread = nil
 
 module Aliquot
-  class Error < StandardError; end
-  class ExpiredException < Error; end
-  class InvalidSignatureError < Error; end
-  class InvalidMacError < Error; end
-
   # Constant-time comparison function
   def self.compare(a, b)
     err = 0
@@ -86,13 +82,14 @@ module Aliquot
   class Payment
     # Parameters:
     # token_string::  Google Pay token (JSON string)
-    # shared_secret:: Base64 encoded shared secret (EC Public key)
+    # shared_secret:: Base64 encoded shared secret
     # merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
     # logger::        The logger to use, check DummyLogger for interface
     # signing_keys::  Formatted list of signing keys used to sign token contents.
     #                 Otherwise a thread continuously updating google signing
     #                 keys will be started.
-    def initialize(token_string, shared_secret, merchant_id, logger = DummyLogger, signing_keys = nil)
+    def initialize(token_string, shared_secret, merchant_id,
+                   logger: Logger.new($stdout), signing_keys: nil)
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
       @signing_keys = signing_keys
 
@@ -188,36 +185,6 @@ module Aliquot
 
     def signing_keys
       @signing_keys || $key_updater_thread.thread_variable_get('keys')
-    end
-  end
-
-  class DummyLogger
-    class << self
-      def debug(message)
-        print(message)
-      end
-
-      def info(message)
-        print(message)
-      end
-
-      def warning(message)
-        print(message)
-      end
-
-      def error(message)
-        print(message)
-      end
-
-      def fatal(message)
-        print(message)
-      end
-
-      private
-
-      def print(message)
-        puts(message)
-      end
     end
   end
 end
