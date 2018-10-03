@@ -163,7 +163,7 @@ describe Aliquot::Validator::EncryptedMessageSchema do
   end
 end
 
-describe Aliquot::Validator::PaymentMethodDetailsSchema, n: true do
+describe Aliquot::Validator::PaymentMethodDetailsSchema do
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
@@ -247,19 +247,19 @@ describe Aliquot::Validator::PaymentMethodDetailsSchema, n: true do
   it 'rejects missing cryptogram when CRYPTOGRAM_3DS' do
     @payment = AliquotPay.payment(auth_method: :CRYPTOGRAM_3DS)
     @payment['paymentMethodDetails'].delete('cryptogram')
-    is_expected.to raise_error(Aliquot::ValidationError, /lala/)
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is CRYPTOGRAM_3DS, cryptogram must be filled/)
   end
 
   it 'rejects ECI data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['eciIndicator'] = '05'
-    is_expected.to raise_error(Aliquot::ValidationError, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is PAN_ONLY, eciIndicator cannot be defined/)
   end
 
   it 'rejects cryptogram data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['cryptogram'] = 'some cryptogram'
-    is_expected.to raise_error(Aliquot::ValidationError, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is PAN_ONLY, cryptogram cannot be defined/)
   end
 
   it 'rejects invalid ECI indicator' do

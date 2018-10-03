@@ -17,7 +17,7 @@ module Aliquot
         pan?:             'must be a pan',
         ec_public_key?:   'must be an EC public key',
         eci?:             'must be an ECI',
-        jsong_string?:    'must be valid JSON',
+        json_string?:     'must be valid JSON',
         integer_string?:  'must be string encoded integer',
         month?:           'must be a month (1..12)',
         year?:            'must be a year (2000..3000)',
@@ -54,7 +54,7 @@ module Aliquot
 
       predicate(:ec_public_key?) { |x| base64?(x) && OpenSSL::PKey::EC.new(Base64.decode64(x)).check_key rescue false }
 
-      predicate(:jsong_string?) { |x| to_bool -> { JSON.parse(x) } }
+      predicate(:json_string?) { |x| !!JSON.parse(x) rescue false }
 
       predicate(:integer_string?) { |x| str?(x) && match_b.call(x, /\A\d+\z/) }
 
@@ -63,6 +63,7 @@ module Aliquot
       predicate(:year?) { |x| x.between?(2000, 3000) }
     end
 
+    # Base for DRY-Validation schemas used in Aliquot.
     class BaseSchema < Dry::Validation::Schema::JSON
       predicates(Predicates)
       def self.messages
@@ -70,20 +71,23 @@ module Aliquot
       end
     end
 
+    # DRY-Validation schema for Google Pay token
     TokenSchema = Dry::Validation.Schema(BaseSchema) do
       required(:signature).filled(:str?, :base64?)
 
       # Currently supposed to be ECv1, but may evolve.
       required(:protocolVersion).filled(:str?)
-      required(:signedMessage).filled(:str?, :jsong_string?)
+      required(:signedMessage).filled(:str?, :json_string?)
     end
 
+    # DRY-Validation schema for signedMessage component Google Pay token
     SignedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:encryptedMessage).filled(:str?, :base64?)
       required(:ephemeralPublicKey).filled(:str?, :base64?)
       required(:tag).filled(:str?, :base64?)
     end
 
+    # DRY-Validation schema for paymentMethodDetails component Google Pay token
     PaymentMethodDetailsSchema = Dry::Validation.Schema(BaseSchema) do
       required(:pan).filled(:integer_string?, :pan?)
       required(:expirationMonth).filled(:int?, :month?)
@@ -93,19 +97,20 @@ module Aliquot
       optional(:cryptogram).filled(:str?)
       optional(:eciIndicator).filled(:str?, :eci?)
 
-      rule('when authMethod is CRYPTOGRAM_3DS': %i[authMethod cryptogram]) do |method, cryptogram|
+      rule('when authMethod is CRYPTOGRAM_3DS, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('CRYPTOGRAM_3DS') > cryptogram.filled?
       end
 
-      rule('when authMethod is PAN_ONLY': %i[authMethod eciIndicator]) do |method, eci|
+      rule('when authMethod is PAN_ONLY, eciIndicator': %i[authMethod eciIndicator]) do |method, eci|
         method.eql?('PAN_ONLY').then(eci.none?)
       end
 
-      rule('when authMethod is PAN_ONLY': %i[authMethod cryptogram]) do |method, cryptogram|
+      rule('when authMethod is PAN_ONLY, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('PAN_ONLY').then(cryptogram.none?)
       end
     end
 
+    # DRY-Validation schema for encryptedMessage component Google Pay token
     EncryptedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:messageExpiration).filled(:str?, :integer_string?)
       required(:messageId).filled(:str?)
@@ -146,6 +151,7 @@ module Aliquot
       end
     end
 
+    # Class for validating a Google Pay token
     class Token
       include InstanceMethods
       class Error < ::Aliquot::Error; end
@@ -155,6 +161,7 @@ module Aliquot
       end
     end
 
+    # Class for validating the SignedMessage component of a Google Pay token
     class SignedMessage
       include InstanceMethods
       class Error < ::Aliquot::Error; end
@@ -164,6 +171,7 @@ module Aliquot
       end
     end
 
+    # Class for validating the encryptedMessage component of a Google Pay token
     class EncryptedMessageValidator
       include InstanceMethods
       class Error < ::Aliquot::Error; end
