@@ -4,16 +4,13 @@ require 'excon'
 require 'hkdf'
 
 require 'aliquot/validator'
+require 'aliquot/error'
 
 $key_updater_semaphore = Mutex.new
 $key_updater_thread = nil
 
 module Aliquot
-  class Error < StandardError; end
-  class ExpiredException < Error; end
-  class InvalidSignatureError < Error; end
-  class InvalidMacError < Error; end
-
+  ##
   # Constant-time comparison function
   def self.compare(a, b)
     err = 0
@@ -27,9 +24,16 @@ module Aliquot
     err.zero?
   end
 
+  ##
+  # Keys used for signing in production
   SIGNING_KEY_URL = 'https://payments.developers.google.com/paymentmethodtoken/keys.json'.freeze
+
+  ##
+  # Keys used for signing in a testing environment
   TEST_SIGNING_KEY_URL = 'https://payments.developers.google.com/paymentmethodtoken/test/keys.json'.freeze
 
+  ##
+  # Start a thread that keeps the Google signing keys updated.
   def self.start_key_updater(logger)
     source = if ENV['ENVIRONMENT'] == 'production'
                SIGNING_KEY_URL
@@ -58,7 +62,7 @@ module Aliquot
 
             Thread.current.thread_variable_set('keys', resp.body)
 
-            # Supposedly recommendd by Tink library
+            # Supposedly recommended by Tink library
             sleep_time = timeout / 2
 
             logger.info('Updated Google signing keys. Sleeping for: ' + (sleep_time / 86400.0).to_s + ' days')
@@ -83,16 +87,22 @@ module Aliquot
     end
   end
 
+  ##
+  # A Payment represents a single payment using Google Pay.
+  # It is used to verify/decrypt the supplied token by using the shared secret,
+  # thus avoiding having knowledge of merchant primary keys.
   class Payment
+    ##
     # Parameters:
     # token_string::  Google Pay token (JSON string)
-    # shared_secret:: Base64 encoded shared secret (EC Public key)
+    # shared_secret:: Base64 encoded shared secret
     # merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
-    # logger::        The logger to use, check DummyLogger for interface
+    # logger::        The logger to use. Default: Logger.new($stdout)
     # signing_keys::  Formatted list of signing keys used to sign token contents.
     #                 Otherwise a thread continuously updating google signing
     #                 keys will be started.
-    def initialize(token_string, shared_secret, merchant_id, logger = DummyLogger, signing_keys = nil)
+    def initialize(token_string, shared_secret, merchant_id,
+                   logger: Logger.new($stdout), signing_keys: nil)
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
       @signing_keys = signing_keys
 
@@ -101,6 +111,8 @@ module Aliquot
       @token_string = token_string
     end
 
+    ##
+    # Validate and decrypt the token.
     def process
       @token = JSON.parse(@token_string)
       validate(Aliquot::Validator::Token, @token)
@@ -132,6 +144,9 @@ module Aliquot
       @message
     end
 
+    ##
+    # Check if the token is expired, according to the messageExpiration included
+    # in the token.
     def expired?
       @message['messageExpiration'].to_f / 1000.0 <= Time.now.to_f
     end
@@ -166,7 +181,7 @@ module Aliquot
       end.join
 
       keys = JSON.parse(signing_keys)['keys']
-      # Check if signature was performed with any possible signature.
+      # Check if signature was performed with any possible key.
       keys.map do |e|
         next if e['protocolVersion'] != @protocol_version
 
@@ -187,37 +202,8 @@ module Aliquot
     end
 
     def signing_keys
+      # Prefer static signing keys, otherwise fetch from updating thread.
       @signing_keys || $key_updater_thread.thread_variable_get('keys')
-    end
-  end
-
-  class DummyLogger
-    class << self
-      def debug(message)
-        print(message)
-      end
-
-      def info(message)
-        print(message)
-      end
-
-      def warning(message)
-        print(message)
-      end
-
-      def error(message)
-        print(message)
-      end
-
-      def fatal(message)
-        print(message)
-      end
-
-      private
-
-      def print(message)
-        puts(message)
-      end
     end
   end
 end

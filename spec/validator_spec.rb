@@ -1,5 +1,4 @@
-require 'aliquot'
-
+require 'aliquot/error'
 require 'spec_helper'
 
 describe Aliquot::Validator::TokenSchema do
@@ -8,7 +7,8 @@ describe Aliquot::Validator::TokenSchema do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', 'no_id', nil, 'no_key')
+      a = Aliquot::Payment.new(token_string, 'no_secret', 'no_id',
+                               signing_keys: '')
       a.process
     end
   end
@@ -21,7 +21,7 @@ describe Aliquot::Validator::TokenSchema do
       it "when sig is '#{sig}'" do
         @payment = AliquotPay.payment
         token['signature'] = sig
-        is_expected.to raise_error(Aliquot::Validator::Error, msg)
+        is_expected.to raise_error(Aliquot::ValidationError, msg)
       end
     end
   end
@@ -29,7 +29,7 @@ describe Aliquot::Validator::TokenSchema do
   it 'rejects invalid protocolversion' do
     @payment = AliquotPay.payment
     token['protocolVersion'] = ''
-    is_expected.to raise_error(Aliquot::Validator::Error, /protocolVersion[^\w]+must be filled/)
+    is_expected.to raise_error(Aliquot::ValidationError, /protocolVersion[^\w]+must be filled/)
   end
 
   context 'rejects invalid signedMessage' do
@@ -40,9 +40,10 @@ describe Aliquot::Validator::TokenSchema do
       it "when message is '#{sig}'" do
         @payment = AliquotPay.payment
         token['signedMessage'] = sig
-        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, nil, keystring)
+        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+                                 signing_keys: keystring)
 
-        expect { a.process }.to raise_error(Aliquot::Validator::Error, msg)
+        expect { a.process }.to raise_error(Aliquot::ValidationError, msg)
       end
     end
   end
@@ -63,7 +64,8 @@ describe Aliquot::Validator::SignedMessageSchema do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id, nil, keystring)
+      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+                               signing_keys: keystring)
       a.process
     end
   end
@@ -76,7 +78,7 @@ describe Aliquot::Validator::SignedMessageSchema do
       it "when msg is '#{msg}'" do
         message['encryptedMessage'] = msg
         @payment = AliquotPay.payment
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -89,7 +91,7 @@ describe Aliquot::Validator::SignedMessageSchema do
       it "is rejected when: '#{msg}'" do
         message['ephemeralPublicKey'] = msg
         @payment = AliquotPay.payment
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -102,13 +104,13 @@ describe Aliquot::Validator::SignedMessageSchema do
       it "is rejected when: '#{msg}'" do
         message['tag'] = msg
         @payment = AliquotPay.payment
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
 end
 
-describe Aliquot::Validator::EncryptedMessage do
+describe Aliquot::Validator::EncryptedMessageSchema do
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
@@ -116,7 +118,8 @@ describe Aliquot::Validator::EncryptedMessage do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
+      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id,
+                               signing_keys: keystring)
       a.process
     end
   end
@@ -129,7 +132,7 @@ describe Aliquot::Validator::EncryptedMessage do
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['messageExpiration'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -137,7 +140,7 @@ describe Aliquot::Validator::EncryptedMessage do
   it 'rejects invalid messageId' do
     @payment = AliquotPay.payment
     @payment['messageId'] = 112
-    is_expected.to raise_error(Aliquot::Validator::Error, /messageId[^\w]+must be a string/)
+    is_expected.to raise_error(Aliquot::ValidationError, /messageId[^\w]+must be a string/)
   end
 
   context 'paymentMethod' do
@@ -148,7 +151,7 @@ describe Aliquot::Validator::EncryptedMessage do
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['paymentMethod'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -156,11 +159,11 @@ describe Aliquot::Validator::EncryptedMessage do
   it 'rejects missing paymentMethodDetails' do
     @payment = AliquotPay.payment
     @payment.delete('paymentMethodDetails')
-    is_expected.to raise_error(Aliquot::Validator::Error, /paymentMethodDetails[^\w]+is missing/)
+    is_expected.to raise_error(Aliquot::ValidationError, /paymentMethodDetails[^\w]+is missing/)
   end
 end
 
-describe Aliquot::Validator::PaymentMethodDetails, n: true do
+describe Aliquot::Validator::PaymentMethodDetailsSchema do
   let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
@@ -168,21 +171,22 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, nil, keystring)
+      a = Aliquot::Payment.new(token_string, shared_secret, merchant_id,
+                               signing_keys: keystring)
       a.process
     end
   end
 
   context 'pan' do
     [
-      [112,            /pan[^\w]+must be a pan/],
-      ['notintstring', /pan[^\w]+must be a pan/],
+      [112,            /pan[^\w]+must be string encoded integer/],
+      ['notintstring', /pan[^\w]+must be string encoded integer/],
       [nil,            /pan[^\w]+must be filled/],
     ].each do |msg, err|
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['paymentMethodDetails']['pan'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -196,7 +200,7 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['paymentMethodDetails']['expirationMonth'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -210,7 +214,7 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['paymentMethodDetails']['expirationYear'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -224,7 +228,7 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
       it "is rejected when: '#{msg}'" do
         @payment = AliquotPay.payment
         @payment['paymentMethodDetails']['authMethod'] = msg
-        is_expected.to raise_error(Aliquot::Validator::Error, err)
+        is_expected.to raise_error(Aliquot::ValidationError, err)
       end
     end
   end
@@ -240,27 +244,33 @@ describe Aliquot::Validator::PaymentMethodDetails, n: true do
     is_expected.to be_truthy
   end
 
+  it 'rejects missing cryptogram when CRYPTOGRAM_3DS' do
+    @payment = AliquotPay.payment(auth_method: :CRYPTOGRAM_3DS)
+    @payment['paymentMethodDetails'].delete('cryptogram')
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is CRYPTOGRAM_3DS, cryptogram must be filled/)
+  end
+
   it 'rejects ECI data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['eciIndicator'] = '05'
-    is_expected.to raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is PAN_ONLY, eciIndicator cannot be defined/)
   end
 
   it 'rejects cryptogram data when CARD' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['cryptogram'] = 'some cryptogram'
-    is_expected.to raise_error(Aliquot::Validator::Error, /authMethodCard.*omitted when PAN_ONLY/)
+    is_expected.to raise_error(Aliquot::ValidationError, /when authMethod is PAN_ONLY, cryptogram cannot be defined/)
   end
 
   it 'rejects invalid ECI indicator' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['eciIndicator'] = 'not an ECI'
-    is_expected.to raise_error(Aliquot::Validator::Error, /eciIndicator must be an ECI/)
+    is_expected.to raise_error(Aliquot::ValidationError, /eciIndicator must be an ECI/)
   end
 
   it 'rejects invalid cryptogram' do
     @payment = AliquotPay.payment(auth_method: :PAN_ONLY)
     @payment['paymentMethodDetails']['cryptogram'] = 124
-    is_expected.to raise_error(Aliquot::Validator::Error, /cryptogram must be a string/)
+    is_expected.to raise_error(Aliquot::ValidationError, /cryptogram must be a string/)
   end
 end

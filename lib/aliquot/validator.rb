@@ -1,7 +1,8 @@
-require 'json'
-require 'dry-validation'
+require 'aliquot/error'
 
 require 'base64'
+require 'dry-validation'
+require 'json'
 require 'openssl'
 
 module Aliquot
@@ -16,8 +17,8 @@ module Aliquot
         pan?:             'must be a pan',
         ec_public_key?:   'must be an EC public key',
         eci?:             'must be an ECI',
-        jsonstring?:      'must be valid JSON',
-        intstring?:       'must be string encoded integer',
+        json_string?:     'must be valid JSON',
+        integer_string?:  'must be string encoded integer',
         month?:           'must be a month (1..12)',
         year?:            'must be a year (2000..3000)',
 
@@ -47,23 +48,22 @@ module Aliquot
       # the above Base64? predicate and use the following simpler one:
       #predicate(:strict_base64?) { |x| !!Base64.strict_decode64(x) rescue false }
 
-      predicate(:pan?) { |x| str?(x) && match_b.call(x, /\A[1-9][0-9]{11,18}\z/) }
+      predicate(:pan?) { |x| match_b.call(x, /\A[1-9][0-9]{11,18}\z/) }
 
       predicate(:eci?) { |x| str?(x) && match_b.call(x, /\A\d{1,2}\z/) }
 
       predicate(:ec_public_key?) { |x| base64?(x) && OpenSSL::PKey::EC.new(Base64.decode64(x)).check_key rescue false }
 
-      predicate(:jsonstring?) { |x| to_bool -> { JSON.parse(x) } }
+      predicate(:json_string?) { |x| !!JSON.parse(x) rescue false }
 
-      predicate(:intstring?) { |x| match_b.call(x, /\A\d+\z/) }
+      predicate(:integer_string?) { |x| str?(x) && match_b.call(x, /\A\d+\z/) }
 
-      predicate(:month?) { |x| x >= 1 && x <= 12 }
+      predicate(:month?) { |x| x.between?(1, 12) }
 
-      predicate(:year?) { |x| x >= 2000 && x <= 3000 }
+      predicate(:year?) { |x| x.between?(2000, 3000) }
     end
 
-    class Error < StandardError; end
-
+    # Base for DRY-Validation schemas used in Aliquot.
     class BaseSchema < Dry::Validation::Schema::JSON
       predicates(Predicates)
       def self.messages
@@ -71,22 +71,25 @@ module Aliquot
       end
     end
 
+    # DRY-Validation schema for Google Pay token
     TokenSchema = Dry::Validation.Schema(BaseSchema) do
       required(:signature).filled(:str?, :base64?)
 
       # Currently supposed to be ECv1, but may evolve.
       required(:protocolVersion).filled(:str?)
-      required(:signedMessage).filled(:str?, :jsonstring?)
+      required(:signedMessage).filled(:str?, :json_string?)
     end
 
+    # DRY-Validation schema for signedMessage component Google Pay token
     SignedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:encryptedMessage).filled(:str?, :base64?)
       required(:ephemeralPublicKey).filled(:str?, :base64?)
       required(:tag).filled(:str?, :base64?)
     end
 
-    PaymentMethodDetails = Dry::Validation.Schema(BaseSchema) do
-      required(:pan).filled(:pan?)
+    # DRY-Validation schema for paymentMethodDetails component Google Pay token
+    PaymentMethodDetailsSchema = Dry::Validation.Schema(BaseSchema) do
+      required(:pan).filled(:integer_string?, :pan?)
       required(:expirationMonth).filled(:int?, :month?)
       required(:expirationYear).filled(:int?, :year?)
       required(:authMethod).filled(:str?, included_in?: %w[PAN_ONLY CRYPTOGRAM_3DS])
@@ -94,20 +97,25 @@ module Aliquot
       optional(:cryptogram).filled(:str?)
       optional(:eciIndicator).filled(:str?, :eci?)
 
-      rule(authMethodCryptogram3DS: %i[authMethod cryptogram]) do |method, cryptogram|
+      rule('when authMethod is CRYPTOGRAM_3DS, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('CRYPTOGRAM_3DS') > cryptogram.filled?
       end
 
-      rule(authMethodCard: %i[authMethod cryptogram eciIndicator]) do |method, cryptogram, eci|
-        method.eql?('PAN_ONLY') > cryptogram.none? & eci.none?
+      rule('when authMethod is PAN_ONLY, eciIndicator': %i[authMethod eciIndicator]) do |method, eci|
+        method.eql?('PAN_ONLY').then(eci.none?)
+      end
+
+      rule('when authMethod is PAN_ONLY, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
+        method.eql?('PAN_ONLY').then(cryptogram.none?)
       end
     end
 
-    EncryptedMessage = Dry::Validation.Schema(BaseSchema) do
-      required(:messageExpiration).filled(:str?, :intstring?)
+    # DRY-Validation schema for encryptedMessage component Google Pay token
+    EncryptedMessageSchema = Dry::Validation.Schema(BaseSchema) do
+      required(:messageExpiration).filled(:str?, :integer_string?)
       required(:messageId).filled(:str?)
       required(:paymentMethod).filled(:str?, eql?: 'CARD')
-      required(:paymentMethodDetails).schema(PaymentMethodDetails)
+      required(:paymentMethodDetails).schema(PaymentMethodDetailsSchema)
     end
 
     module InstanceMethods
@@ -117,7 +125,7 @@ module Aliquot
         @validation ||= @schema.call(@input)
         @output = @validation.output
         return true if @validation.success?
-        raise Error, "validation error: #{errors_formatted}"
+        raise Aliquot::ValidationError, "validation error: #{errors_formatted}"
       end
 
       def valid?
@@ -143,30 +151,33 @@ module Aliquot
       end
     end
 
+    # Class for validating a Google Pay token
     class Token
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Error; end
       def initialize(input)
         @input = input
         @schema = TokenSchema
       end
     end
 
+    # Class for validating the SignedMessage component of a Google Pay token
     class SignedMessage
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Error; end
       def initialize(input)
         @input = input
         @schema = SignedMessageSchema
       end
     end
 
+    # Class for validating the encryptedMessage component of a Google Pay token
     class EncryptedMessageValidator
       include InstanceMethods
-      class Error < StandardError; end
+      class Error < ::Aliquot::Error; end
       def initialize(input)
         @input = input
-        @schema = EncryptedMessage
+        @schema = EncryptedMessageSchema
       end
     end
   end
