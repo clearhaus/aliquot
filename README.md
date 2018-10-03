@@ -1,5 +1,8 @@
 # Aliquot #
 
+[![CircleCI](https://circleci.com/gh/clearhaus/aliquot/tree/master.svg?style=svg)](https://circleci.com/gh/clearhaus/aliquot/tree/master)
+[![Gem Version](https://badge.fury.io/rb/aliquot.svg)](https://badge.fury.io/rb/aliquot)
+
 ## Example usage ##
 
 For usage examples it's best to look at unit tests. As an example from `dummy_spec.rb`.
