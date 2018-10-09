@@ -78,12 +78,11 @@ module Aliquot
 
       keys = JSON.parse(signing_keys)['keys']
       # Check if signature was performed with any possible key.
-      keys.map do |e|
-        next if e['protocolVersion'] != protocol_version
+      keys.map do |key|
+        next if key['protocolVersion'] != protocol_version
 
-        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
-        d  = OpenSSL::Digest::SHA256.new
-        ec.verify(d, Base64.strict_decode64(@token[:signature]), signed_string)
+        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(key['keyValue']))
+        ec.verify(OpenSSL::Digest::SHA256.new, Base64.strict_decode64(@token[:signature]), signed_string)
       end.any?
     end
 
