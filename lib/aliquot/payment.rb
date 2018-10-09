@@ -72,6 +72,22 @@ module Aliquot
       @message['messageExpiration'].to_f / 1000.0 <= Time.now.to_f
     end
 
+    def valid_signature?
+      signed_string = ['Google', @merchant_id, protocol_version, @token['signedMessage']].map do |str|
+        [str.length].pack('V') + str
+      end.join
+
+      keys = JSON.parse(signing_keys)['keys']
+      # Check if signature was performed with any possible key.
+      keys.map do |e|
+        next if e['protocolVersion'] != protocol_version
+
+        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
+        d  = OpenSSL::Digest::SHA256.new
+        ec.verify(d, Base64.strict_decode64(@token['signature']), signed_string)
+      end.any?
+    end
+
     private
 
     def validate(klass, data)
@@ -93,26 +109,6 @@ module Aliquot
       c.decrypt
       plain = c.update(Base64.strict_decode64(encrypted)) + c.final
       JSON.parse(plain)
-    end
-
-    def valid_signature?
-      message = @token['signedMessage']
-      signature = @token['signature']
-
-      # Generate the string that was signed.
-      signed_string = ['Google', @merchant_id, @protocol_version, message].map do |str|
-        [str.length].pack('V') + str
-      end.join
-
-      keys = JSON.parse(signing_keys)['keys']
-      # Check if signature was performed with any possible key.
-      keys.map do |e|
-        next if e['protocolVersion'] != @protocol_version
-
-        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
-        d  = OpenSSL::Digest::SHA256.new
-        ec.verify(d, Base64.strict_decode64(signature), signed_string)
-      end.any?
     end
 
     def valid_mac?(mac_key, data, tag)
