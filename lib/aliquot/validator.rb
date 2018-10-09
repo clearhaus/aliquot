@@ -83,7 +83,7 @@ module Aliquot
     # DRY-Validation schema for signedMessage component Google Pay token
     SignedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:encryptedMessage).filled(:str?, :base64?)
-      required(:ephemeralPublicKey).filled(:str?, :base64?)
+      required(:ephemeralPublicKey).filled(:str?, :base64?).value(size?: 44)
       required(:tag).filled(:str?, :base64?)
     end
 

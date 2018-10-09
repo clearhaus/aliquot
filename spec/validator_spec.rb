@@ -38,12 +38,14 @@ describe Aliquot::Validator::TokenSchema do
       ['not JSON',   /signedMessage[^\w]+must be valid JSON/],
     ].each do |sig, msg|
       it "when message is '#{sig}'" do
-        @payment = AliquotPay.payment
-        token['signedMessage'] = sig
-        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
-                                 signing_keys: keystring)
+        expect do
+          @payment = AliquotPay.payment
+          token['signedMessage'] = sig
+          a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+                                   signing_keys: keystring)
 
-        expect { a.process }.to raise_error(Aliquot::ValidationError, msg)
+          a.process
+        end.to raise_error(Aliquot::ValidationError, msg)
       end
     end
   end

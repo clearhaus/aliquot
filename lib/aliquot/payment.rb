@@ -35,21 +35,19 @@ module Aliquot
         raise Error, 'only ECv1 protocolVersion is supported'
       end
 
-      unless valid_signature?
-        raise InvalidSignatureError
-      end
+      raise InvalidSignatureError unless valid_signature?
 
-      validator = Aliquot::Validator::SignedMessage.new(JSON.parse(@token['signedMessage']))
+      validator = Aliquot::Validator::SignedMessage.new(JSON.parse(@token[:signedMessage]))
       validator.validate
       signed_message = validator.output
 
-      aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'], @shared_secret, 'Google')
+      aes_key, mac_key = derive_keys(signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
 
-      unless self.class.valid_mac?(mac_key, signed_message['encryptedMessage'], signed_message['tag'])
+      unless self.class.valid_mac?(mac_key, signed_message[:encryptedMessage], signed_message[:tag])
         raise InvalidMacError
       end
 
-      @message = JSON.parse(self.class.decrypt(aes_key, signed_message['encryptedMessage']))
+      @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
 
       Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
 
@@ -59,7 +57,7 @@ module Aliquot
     end
 
     def protocol_version
-      @token['protocolVersion']
+      @token[:protocolVersion]
     end
 
     def valid_protocol_version?
@@ -74,7 +72,7 @@ module Aliquot
     end
 
     def valid_signature?
-      signed_string = ['Google', @merchant_id, protocol_version, @token['signedMessage']].map do |str|
+      signed_string = ['Google', @merchant_id, protocol_version, @token[:signedMessage]].map do |str|
         [str.length].pack('V') + str
       end.join
 
@@ -85,7 +83,7 @@ module Aliquot
 
         ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(e['keyValue']))
         d  = OpenSSL::Digest::SHA256.new
-        ec.verify(d, Base64.strict_decode64(@token['signature']), signed_string)
+        ec.verify(d, Base64.strict_decode64(@token[:signature]), signed_string)
       end.any?
     end
 

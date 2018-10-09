@@ -1,4 +1,5 @@
 require 'aliquot'
+require 'aliquot/payment'
 
 require 'aliquot-pay'
 
