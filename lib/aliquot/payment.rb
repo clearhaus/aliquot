@@ -37,18 +37,18 @@ module Aliquot
         raise InvalidSignatureError
       end
 
-      @signed_message = JSON.parse(@token['signedMessage'])
-      validate(Aliquot::Validator::SignedMessage, @signed_message)
+      signed_message = JSON.parse(@token['signedMessage'])
+      validate(Aliquot::Validator::SignedMessage, signed_message)
 
-      aes_key, mac_key = derive_keys(@signed_message['ephemeralPublicKey'],
+      aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'],
                                      @shared_secret,
                                      'Google')
 
       raise InvalidMacError unless valid_mac?(mac_key,
-                                              @signed_message['encryptedMessage'],
-                                              @signed_message['tag'])
+                                              signed_message['encryptedMessage'],
+                                              signed_message['tag'])
 
-      @message = decrypt(aes_key, @signed_message['encryptedMessage'])
+      @message = decrypt(aes_key, signed_message['encryptedMessage'])
 
       validate(Aliquot::Validator::EncryptedMessageValidator, @message)
 
