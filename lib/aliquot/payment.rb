@@ -29,9 +29,9 @@ module Aliquot
     ##
     # Validate and decrypt the token.
     def process
-      @protocol_version = @token['protocolVersion']
-
-      raise Error, 'only ECv1 protocolVersion is supported' unless @protocol_version == 'ECv1'
+      unless valid_protocol_version?
+        raise Error, 'only ECv1 protocolVersion is supported'
+      end
 
       raise InvalidSignatureError unless valid_signature?(@token['signedMessage'], @token['signature'])
 
@@ -53,6 +53,10 @@ module Aliquot
       raise ExpiredException if expired?
 
       @message
+    end
+
+    def valid_protocol_version?
+      @token['protocolVersion'] == 'ECv1'
     end
 
     ##
