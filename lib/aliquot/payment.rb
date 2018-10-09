@@ -37,8 +37,9 @@ module Aliquot
         raise InvalidSignatureError
       end
 
-      signed_message = JSON.parse(@token['signedMessage'])
-      validate(Aliquot::Validator::SignedMessage, signed_message)
+      validator = Aliquot::Validator::SignedMessage.new(JSON.parse(@token['signedMessage']))
+      validator.validate
+      signed_message = validator.output
 
       aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'],
                                      @shared_secret,
