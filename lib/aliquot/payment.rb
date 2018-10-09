@@ -43,7 +43,7 @@ module Aliquot
 
       aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'], @shared_secret, 'Google')
 
-      unless valid_mac?(mac_key, signed_message['encryptedMessage'], signed_message['tag'])
+      unless self.class.valid_mac?(mac_key, signed_message['encryptedMessage'], signed_message['tag'])
         raise InvalidMacError
       end
 
@@ -105,12 +105,12 @@ module Aliquot
       c.update(Base64.strict_decode64(encrypted)) + c.final
     end
 
-    def valid_mac?(mac_key, data, tag)
+    def self.valid_mac?(mac_key, data, tag)
       d = OpenSSL::Digest::SHA256.new
       mac = OpenSSL::HMAC.digest(d, mac_key, Base64.strict_decode64(data))
       mac = Base64.strict_encode64(mac)
 
-      self.class.compare(mac, tag)
+      compare(mac, tag)
     end
 
     def self.compare(a, b)
