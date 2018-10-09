@@ -118,10 +118,10 @@ module Aliquot
 
       diffs = 0
 
-      y = b.unpack('C*')
+      ys = b.unpack('C*')
 
       a.each_byte do |x|
-        diffs |= x ^ y.shift
+        diffs |= x ^ ys.shift
       end
 
       diffs.zero?
