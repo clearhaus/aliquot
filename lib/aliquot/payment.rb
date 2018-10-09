@@ -13,7 +13,9 @@ module Aliquot
     # signing_keys::  Formatted list of signing keys used to sign token contents.
     #                 Otherwise a thread continuously updating google signing
     #                 keys will be started.
-    def initialize(token_string, shared_secret, merchant_id, logger: Logger.new($stdout), signing_keys: nil)
+    def initialize(token_string, shared_secret, merchant_id,
+                   logger: Logger.new($stdout),
+                   signing_keys: ENV['GOOGLE_SIGNING_KEYS'])
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
 
       validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
