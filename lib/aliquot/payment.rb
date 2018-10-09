@@ -15,7 +15,11 @@ module Aliquot
     #                 keys will be started.
     def initialize(token_string, shared_secret, merchant_id, logger: Logger.new($stdout), signing_keys: nil)
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
-      @signing_keys = signing_keys
+
+      validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
+      validation.validate
+
+      @token = validation.output
 
       @shared_secret = shared_secret
       @merchant_id   = merchant_id
@@ -25,9 +29,6 @@ module Aliquot
     ##
     # Validate and decrypt the token.
     def process
-      @token = JSON.parse(@token_string)
-      validate(Aliquot::Validator::Token, @token)
-
       @protocol_version = @token['protocolVersion']
 
       raise Error, 'only ECv1 protocolVersion is supported' unless @protocol_version == 'ECv1'
