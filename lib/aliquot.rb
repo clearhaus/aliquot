@@ -11,20 +11,6 @@ $key_updater_thread = nil
 
 module Aliquot
   ##
-  # Constant-time comparison function
-  def self.compare(a, b)
-    err = 0
-
-    y = b.unpack('C*')
-
-    a.each_byte do |x|
-      err |= x ^ y.shift
-    end
-
-    err.zero?
-  end
-
-  ##
   # Keys used for signing in production
   SIGNING_KEY_URL = 'https://payments.developers.google.com/paymentmethodtoken/keys.json'.freeze
 

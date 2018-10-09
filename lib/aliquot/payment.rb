@@ -111,8 +111,19 @@ module Aliquot
       mac = Base64.strict_encode64(mac)
 
       return false if mac.length != tag.length
+      self.class.compare(mac, tag)
+    end
 
-      Aliquot.compare(mac, tag)
+    def self.compare(a, b)
+      err = 0
+
+      y = b.unpack('C*')
+
+      a.each_byte do |x|
+        err |= x ^ y.shift
+      end
+
+      err.zero?
     end
 
     def signing_keys
