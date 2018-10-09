@@ -43,11 +43,11 @@ module Aliquot
 
       aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'], @shared_secret, 'Google')
 
-      raise InvalidMacError unless valid_mac?(mac_key,
-                                              signed_message['encryptedMessage'],
-                                              signed_message['tag'])
+      unless valid_mac?(mac_key, signed_message['encryptedMessage'], signed_message['tag'])
+        raise InvalidMacError
+      end
 
-      @message = decrypt(aes_key, signed_message['encryptedMessage'])
+      @message = JSON.parse(decrypt(aes_key, signed_message['encryptedMessage']))
 
       Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
 
@@ -101,8 +101,8 @@ module Aliquot
       c = OpenSSL::Cipher::AES128.new(:CTR)
       c.key = key
       c.decrypt
-      plain = c.update(Base64.strict_decode64(encrypted)) + c.final
-      JSON.parse(plain)
+
+      c.update(Base64.strict_decode64(encrypted)) + c.final
     end
 
     def valid_mac?(mac_key, data, tag)
