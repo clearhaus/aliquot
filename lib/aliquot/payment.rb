@@ -13,14 +13,13 @@ module Aliquot
     # signing_keys::  Formatted list of signing keys used to sign token contents.
     #                 Otherwise a thread continuously updating google signing
     #                 keys will be started.
-    def initialize(token_string, shared_secret, merchant_id,
-                   logger: Logger.new($stdout), signing_keys: nil)
+    def initialize(token_string, shared_secret, merchant_id, logger: Logger.new($stdout), signing_keys: nil)
       Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
       @signing_keys = signing_keys
 
       @shared_secret = shared_secret
-      @merchant_id = merchant_id
-      @token_string = token_string
+      @merchant_id   = merchant_id
+      @signing_keys  = signing_keys
     end
 
     ##
@@ -33,8 +32,7 @@ module Aliquot
 
       raise Error, 'only ECv1 protocolVersion is supported' unless @protocol_version == 'ECv1'
 
-      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'],
-                                                          @token['signature'])
+      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'], @token['signature'])
 
       @signed_message = JSON.parse(@token['signedMessage'])
       validate(Aliquot::Validator::SignedMessage, @signed_message)
