@@ -33,7 +33,9 @@ module Aliquot
         raise Error, 'only ECv1 protocolVersion is supported'
       end
 
-      raise InvalidSignatureError unless valid_signature?(@token['signedMessage'], @token['signature'])
+      unless valid_signature?
+        raise InvalidSignatureError
+      end
 
       @signed_message = JSON.parse(@token['signedMessage'])
       validate(Aliquot::Validator::SignedMessage, @signed_message)
@@ -89,7 +91,10 @@ module Aliquot
       JSON.parse(plain)
     end
 
-    def valid_signature?(message, signature)
+    def valid_signature?
+      message = @token['signedMessage']
+      signature = @token['signature']
+
       # Generate the string that was signed.
       signed_string = ['Google', @merchant_id, @protocol_version, message].map do |str|
         [str.length].pack('V') + str
