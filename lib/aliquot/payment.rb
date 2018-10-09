@@ -57,8 +57,12 @@ module Aliquot
       @message
     end
 
+    def protocol_version
+      @token['protocolVersion']
+    end
+
     def valid_protocol_version?
-      @token['protocolVersion'] == 'ECv1'
+      protocol_version == 'ECv1'
     end
 
     ##
