@@ -106,11 +106,10 @@ module Aliquot
     end
 
     def self.valid_mac?(mac_key, data, tag)
-      d = OpenSSL::Digest::SHA256.new
-      mac = OpenSSL::HMAC.digest(d, mac_key, Base64.strict_decode64(data))
-      mac = Base64.strict_encode64(mac)
+      digest = OpenSSL::Digest::SHA256.new
+      mac = OpenSSL::HMAC.digest(digest, mac_key, Base64.strict_decode64(data))
 
-      compare(mac, tag)
+      compare(Base64.strict_encode64(mac), tag)
     end
 
     def self.compare(a, b)
