@@ -90,11 +90,10 @@ module Aliquot
     private
 
     def derive_keys(ephemeral_public_key, shared_secret, info)
-      ikm = Base64.strict_decode64(ephemeral_public_key) +
-            Base64.strict_decode64(shared_secret)
-      hbytes = HKDF.new(ikm, algorithm: 'SHA256', info: info).next_bytes(32)
+      input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
+      key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
 
-      [hbytes[0..15], hbytes[16..32]]
+      [key_bytes[0..15], key_bytes[16..32]]
     end
 
     def self.decrypt(key, encrypted)
