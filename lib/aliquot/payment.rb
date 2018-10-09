@@ -110,11 +110,12 @@ module Aliquot
       mac = OpenSSL::HMAC.digest(d, mac_key, Base64.strict_decode64(data))
       mac = Base64.strict_encode64(mac)
 
-      return false if mac.length != tag.length
       self.class.compare(mac, tag)
     end
 
     def self.compare(a, b)
+      return false unless a.length == b.length
+
       err = 0
 
       y = b.unpack('C*')
