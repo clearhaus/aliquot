@@ -47,7 +47,7 @@ module Aliquot
         raise InvalidMacError
       end
 
-      @message = JSON.parse(decrypt(aes_key, signed_message['encryptedMessage']))
+      @message = JSON.parse(self.class.decrypt(aes_key, signed_message['encryptedMessage']))
 
       Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
 
@@ -97,7 +97,7 @@ module Aliquot
       [hbytes[0..15], hbytes[16..32]]
     end
 
-    def decrypt(key, encrypted)
+    def self.decrypt(key, encrypted)
       c = OpenSSL::Cipher::AES128.new(:CTR)
       c.key = key
       c.decrypt
