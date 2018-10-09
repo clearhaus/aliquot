@@ -116,15 +116,15 @@ module Aliquot
     def self.compare(a, b)
       return false unless a.length == b.length
 
-      err = 0
+      diffs = 0
 
       y = b.unpack('C*')
 
       a.each_byte do |x|
-        err |= x ^ y.shift
+        diffs |= x ^ y.shift
       end
 
-      err.zero?
+      diffs.zero?
     end
 
     def signing_keys
