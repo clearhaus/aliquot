@@ -41,9 +41,7 @@ module Aliquot
       validator.validate
       signed_message = validator.output
 
-      aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'],
-                                     @shared_secret,
-                                     'Google')
+      aes_key, mac_key = derive_keys(signed_message['ephemeralPublicKey'], @shared_secret, 'Google')
 
       raise InvalidMacError unless valid_mac?(mac_key,
                                               signed_message['encryptedMessage'],
@@ -51,7 +49,7 @@ module Aliquot
 
       @message = decrypt(aes_key, signed_message['encryptedMessage'])
 
-      validate(Aliquot::Validator::EncryptedMessageValidator, @message)
+      Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
 
       raise ExpiredException if expired?
 
@@ -90,11 +88,6 @@ module Aliquot
     end
 
     private
-
-    def validate(klass, data)
-      validator = klass.new(data)
-      validator.validate
-    end
 
     def derive_keys(ephemeral_public_key, shared_secret, info)
       ikm = Base64.strict_decode64(ephemeral_public_key) +
