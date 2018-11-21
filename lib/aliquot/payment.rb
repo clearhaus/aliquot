@@ -49,6 +49,15 @@ module Aliquot
 
       @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
 
+      def transform_keys_recursively!(hash)
+        hash.keys.each do |key|
+          transform_keys_recursively!(hash[key]) if hash[key].kind_of?(Hash)
+          hash[(key.to_sym rescue key) || key] = hash.delete(key)
+        end
+      end
+
+      transform_keys_recursively!(@message)
+
       Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
 
       raise ExpiredException if expired?
@@ -68,7 +77,7 @@ module Aliquot
     # Check if the token is expired, according to the messageExpiration included
     # in the token.
     def expired?
-      @message['messageExpiration'].to_f / 1000.0 <= Time.now.to_f
+      @message[:messageExpiration].to_f / 1000.0 <= Time.now.to_f
     end
 
     def valid_signature?
