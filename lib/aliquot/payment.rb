@@ -49,16 +49,9 @@ module Aliquot
 
       @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
 
-      def transform_keys_recursively!(hash)
-        hash.keys.each do |key|
-          transform_keys_recursively!(hash[key]) if hash[key].kind_of?(Hash)
-          hash[(key.to_sym rescue key) || key] = hash.delete(key)
-        end
-      end
-
-      transform_keys_recursively!(@message)
-
-      Aliquot::Validator::EncryptedMessageValidator.new(@message).validate
+      message_validator = Aliquot::Validator::EncryptedMessageValidator.new(@message)
+      message_validator.validate
+      @message = message_validator.output
 
       raise ExpiredException if expired?
 
