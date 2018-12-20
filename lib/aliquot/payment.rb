@@ -88,15 +88,6 @@ module Aliquot
       end.any?
     end
 
-    private
-
-    def derive_keys(ephemeral_public_key, shared_secret, info)
-      input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
-      key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
-
-      [key_bytes[0..15], key_bytes[16..32]]
-    end
-
     def self.decrypt(key, encrypted)
       c = OpenSSL::Cipher::AES128.new(:CTR)
       c.key = key
@@ -124,6 +115,15 @@ module Aliquot
       end
 
       diffs.zero?
+    end
+
+    private
+
+    def derive_keys(ephemeral_public_key, shared_secret, info)
+      input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
+      key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
+
+      [key_bytes[0..15], key_bytes[16..32]]
     end
 
     def signing_keys
