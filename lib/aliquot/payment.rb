@@ -51,6 +51,8 @@ module Aliquot
 
       message_validator = Aliquot::Validator::EncryptedMessageValidator.new(@message)
       message_validator.validate
+
+      # Output is hashed with symbolized keys.
       @message = message_validator.output
 
       raise ExpiredException if expired?
@@ -119,9 +121,16 @@ module Aliquot
 
     private
 
+    # Keys are derived according to the Google Pay specification.
     def derive_keys(ephemeral_public_key, shared_secret, info)
       input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
-      key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
+
+      if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf)
+        h = OpenSSL::Digest::SHA256.new
+        key_bytes = OpenSSL::KDF.hkdf(input_keying_material, hash: h, salt: '', length: 32, info: info)
+      else
+        key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
+      end
 
       [key_bytes[0..15], key_bytes[16..32]]
     end
