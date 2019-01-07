@@ -1,3 +1,11 @@
+require 'json'
+require 'base64'
+require 'hkdf'
+require 'openssl'
+
+require 'aliquot/error'
+require 'aliquot/validator'
+
 module Aliquot
   ##
   # A Payment represents a single payment using Google Pay.
@@ -9,14 +17,9 @@ module Aliquot
     # token_string::  Google Pay token (JSON string)
     # shared_secret:: Base64 encoded shared secret
     # merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
-    # logger::        The logger to use. Default: Logger.new($stdout)
-    # signing_keys::  Formatted list of signing keys used to sign token contents.
-    #                 Otherwise a thread continuously updating google signing
-    #                 keys will be started.
+    # signing_keys::  Signing keys fetched from Google
     def initialize(token_string, shared_secret, merchant_id,
-                   logger: Logger.new($stdout),
                    signing_keys: ENV['GOOGLE_SIGNING_KEYS'])
-      Aliquot.start_key_updater(logger) if $key_updater_thread.nil? && signing_keys.nil?
 
       validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
       validation.validate
@@ -80,7 +83,7 @@ module Aliquot
         [str.length].pack('V') + str
       end.join
 
-      keys = JSON.parse(signing_keys)['keys']
+      keys = JSON.parse(@signing_keys)['keys']
       # Check if signature was performed with any possible key.
       keys.map do |key|
         next if key['protocolVersion'] != protocol_version
@@ -133,11 +136,6 @@ module Aliquot
       end
 
       [key_bytes[0..15], key_bytes[16..32]]
-    end
-
-    def signing_keys
-      # Prefer static signing keys, otherwise fetch from updating thread.
-      @signing_keys || $key_updater_thread.thread_variable_get('keys')
     end
   end
 end
