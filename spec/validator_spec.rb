@@ -63,10 +63,11 @@ describe Aliquot::Validator::SignedMessageSchema do
 
   let(:token) { AliquotPay.generate_token(@payment, key, recipient, JSON.unparse(message)) }
   let(:token_string) { JSON.unparse(token) }
+  let(:dummy_shared_secret) { Base64.strict_encode64(Random.new.bytes(32)) }
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+      a = Aliquot::Payment.new(token_string, dummy_shared_secret, merchant_id,
                                signing_keys: keystring)
       a.process
     end

@@ -125,7 +125,7 @@ module Aliquot
         @validation ||= @schema.call(@input)
         @output = @validation.output
         return true if @validation.success?
-        raise Aliquot::ValidationError, "validation error: #{errors_formatted}"
+        raise Aliquot::ValidationError, "validation error(s), #{errors_formatted}"
       end
 
       def valid?

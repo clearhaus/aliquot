@@ -36,7 +36,7 @@ describe Aliquot::Payment do
 
   it 'rejects expired token' do
     @payment = AliquotPay.payment(expiration: ((Time.now.to_f - 1) * 1000).round.to_s)
-    is_expected.to raise_error(Aliquot::ExpiredException)
+    is_expected.to raise_error(Aliquot::TokenExpiredError)
   end
 
   it 'it fails validation on invalid merchant_id' do

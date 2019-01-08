@@ -21,8 +21,12 @@ module Aliquot
     def initialize(token_string, shared_secret, merchant_id,
                    signing_keys: ENV['GOOGLE_SIGNING_KEYS'])
 
-      validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
-      validation.validate
+      begin
+        validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
+        validation.validate
+      rescue JSON::JSONError => e
+        raise InputError, "token JSON invalid, #{e.message}"
+      end
 
       @token = validation.output
 
@@ -38,19 +42,31 @@ module Aliquot
         raise Error, 'only ECv1 protocolVersion is supported'
       end
 
+      check_shared_secret
+
       raise InvalidSignatureError unless valid_signature?
 
       validator = Aliquot::Validator::SignedMessage.new(JSON.parse(@token[:signedMessage]))
       validator.validate
       signed_message = validator.output
 
-      aes_key, mac_key = derive_keys(signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
+      begin
+        aes_key, mac_key = derive_keys(signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
+      rescue => e
+        raise KeyDerivationError, "unable to derive keys, #{e.message}"
+      end
 
       unless self.class.valid_mac?(mac_key, signed_message[:encryptedMessage], signed_message[:tag])
         raise InvalidMacError
       end
 
-      @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
+      begin
+        @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
+      rescue JSON::JSONError => e
+        raise InputError, "encryptedMessage JSON invalid, #{e.message}"
+      rescue => e
+        raise DecryptionError, "decryption failed, #{e.message}"
+      end
 
       message_validator = Aliquot::Validator::EncryptedMessageValidator.new(@message)
       message_validator.validate
@@ -58,7 +74,7 @@ module Aliquot
       # Output is hashed with symbolized keys.
       @message = message_validator.output
 
-      raise ExpiredException if expired?
+      raise TokenExpiredError if expired?
 
       @message
     end
@@ -136,6 +152,16 @@ module Aliquot
       end
 
       [key_bytes[0..15], key_bytes[16..32]]
+    end
+
+    def check_shared_secret
+      begin
+        decoded = Base64.strict_decode64(@shared_secret)
+      rescue
+        raise InvalidSharedSecretError, 'shared_secret must be base64'
+      end
+
+      raise InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded' unless decoded.length == 32
     end
   end
 end
