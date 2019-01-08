@@ -61,7 +61,7 @@ describe Aliquot::Validator::SignedMessageSchema do
     }
   end
 
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient, message) }
+  let(:token) { AliquotPay.generate_token(@payment, key, recipient, JSON.unparse(message)) }
   let(:token_string) { JSON.unparse(token) }
 
   subject do
