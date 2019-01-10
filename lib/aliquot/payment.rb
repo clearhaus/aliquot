@@ -50,7 +50,7 @@ module Aliquot
 
       check_shared_secret
 
-      valiate_signature
+      validate_signature
 
       @signed_message = validate_signed_message
 
@@ -110,7 +110,7 @@ module Aliquot
       raise InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded' unless decoded.length == 32
     end
 
-    def valiate_signature
+    def validate_signature
       signed_string_message = ['Google', @merchant_id, protocol_version, @token[:signedMessage]].map do |str|
         [str.length].pack('V') + str
       end.join
