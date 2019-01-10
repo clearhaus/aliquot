@@ -3,8 +3,6 @@ require 'aliquot-pay'
 require 'json'
 require 'openssl'
 
-require 'pry'
-
 describe Aliquot::Payment do
   let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
