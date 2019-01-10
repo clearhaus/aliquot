@@ -2,7 +2,7 @@ require 'aliquot/error'
 require 'spec_helper'
 
 describe Aliquot::Validator::TokenSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
   subject do
@@ -61,7 +61,7 @@ describe Aliquot::Validator::SignedMessageSchema do
     }
   end
 
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient, JSON.unparse(message)) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient, JSON.unparse(message)) }
   let(:token_string) { JSON.unparse(token) }
   let(:dummy_shared_secret) { Base64.strict_encode64(Random.new.bytes(32)) }
 
@@ -114,7 +114,7 @@ describe Aliquot::Validator::SignedMessageSchema do
 end
 
 describe Aliquot::Validator::EncryptedMessageSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
@@ -167,7 +167,7 @@ describe Aliquot::Validator::EncryptedMessageSchema do
 end
 
 describe Aliquot::Validator::PaymentMethodDetailsSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }

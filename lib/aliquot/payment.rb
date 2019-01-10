@@ -12,6 +12,7 @@ module Aliquot
   # It is used to verify/decrypt the supplied token by using the shared secret,
   # thus avoiding having knowledge of merchant primary keys.
   class Payment
+    SUPPORTED_PROTOCOL_VERSIONS = %w[ECv1 ECv2].freeze
     ##
     # Parameters:
     # token_string::  Google Pay token (JSON string)
@@ -39,40 +40,37 @@ module Aliquot
     # Validate and decrypt the token.
     def process
       unless valid_protocol_version?
-        raise Error, 'only ECv1 protocolVersion is supported'
+        raise Error, "supported protocol versions are #{SUPPORTED_PROTOCOL_VERSIONS.join(', ')}"
+      end
+
+      if protocol_version == 'ECv2'
+        @intermediate_key = validate_intermediate_key
+        raise InvalidSignatureError, 'intermediate certificate expired' if intermediate_key_expired?
       end
 
       check_shared_secret
 
-      raise InvalidSignatureError unless valid_signature?
+      valiate_signature
 
-      validator = Aliquot::Validator::SignedMessage.new(JSON.parse(@token[:signedMessage]))
-      validator.validate
-      signed_message = validator.output
+      @signed_message = validate_signed_message
 
       begin
-        aes_key, mac_key = derive_keys(signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
+        aes_key, mac_key = derive_keys(@signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
       rescue => e
         raise KeyDerivationError, "unable to derive keys, #{e.message}"
       end
 
-      unless self.class.valid_mac?(mac_key, signed_message[:encryptedMessage], signed_message[:tag])
-        raise InvalidMacError
-      end
+      raise InvalidMacError unless valid_mac?(mac_key)
 
       begin
-        @message = JSON.parse(self.class.decrypt(aes_key, signed_message[:encryptedMessage]))
+        @message = JSON.parse(decrypt(aes_key, @signed_message[:encryptedMessage]))
       rescue JSON::JSONError => e
         raise InputError, "encryptedMessage JSON invalid, #{e.message}"
       rescue => e
         raise DecryptionError, "decryption failed, #{e.message}"
       end
 
-      message_validator = Aliquot::Validator::EncryptedMessageValidator.new(@message)
-      message_validator.validate
-
-      # Output is hashed with symbolized keys.
-      @message = message_validator.output
+      @message = validate_message
 
       raise TokenExpiredError if expired?
 
@@ -84,7 +82,130 @@ module Aliquot
     end
 
     def valid_protocol_version?
-      protocol_version == 'ECv1'
+      SUPPORTED_PROTOCOL_VERSIONS.include?(protocol_version)
+    end
+
+    def validate_intermediate_key
+      # Valid JSON as it has been checked by Token Validator.
+      intermediate_key = JSON.parse(@token[:intermediateSigningKey][:signedKey])
+
+      validator = Aliquot::Validator::SignedKeyValidator.new(intermediate_key)
+      validator.validate
+
+      validator.output
+    end
+
+    def intermediate_key_expired?
+      cur_millis = (Time.now.to_f * 1000).round
+      @intermediate_key[:keyExpiration].to_i < cur_millis
+    end
+
+    def check_shared_secret
+      begin
+        decoded = Base64.strict_decode64(@shared_secret)
+      rescue
+        raise InvalidSharedSecretError, 'shared_secret must be base64'
+      end
+
+      raise InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded' unless decoded.length == 32
+    end
+
+    def valiate_signature
+      signed_string_message = ['Google', @merchant_id, protocol_version, @token[:signedMessage]].map do |str|
+        [str.length].pack('V') + str
+      end.join
+      message_signature = Base64.strict_decode64(@token[:signature])
+
+      root_signing_keys = JSON.parse(@signing_keys)['keys'].select do |key|
+        key['protocolVersion'] == protocol_version
+      end
+
+      root_signing_keys.map! do |key|
+        OpenSSL::PKey::EC.new(Base64.strict_decode64(key['keyValue']))
+      end
+
+      case protocol_version
+      when 'ECv1'
+        # Check if signature was performed directly with any possible key.
+        success =
+          root_signing_keys.map do |key|
+            key.verify(digest, message_signature, signed_string_message)
+          end.any?
+
+        raise InvalidSignatureError unless success
+      when 'ECv2'
+        signed_key_signature = ['Google', 'ECv2', @token[:intermediateSigningKey][:signedKey]].map do |str|
+          [str.length].pack('V') + str
+        end.join
+
+        # Check that the intermediate key signed the message
+        pkey = OpenSSL::PKey::EC.new(Base64.strict_decode64(@intermediate_key[:keyValue]))
+        raise InvalidSignatureError, 'intermediate did not sign message' unless pkey.verify(digest, message_signature, signed_string_message)
+
+        intermediate_signatures = @token[:intermediateSigningKey][:signatures]
+
+        success = valid_intermediate_key_signatures?(
+          root_signing_keys,
+          intermediate_signatures,
+          signed_key_signature
+        )
+
+        raise InvalidSignatureError, 'intermediate not signed' unless success
+      end
+    end
+
+    def valid_intermediate_key_signatures?(signing_keys, signatures, signed)
+      signing_keys.map do |key|
+        signatures.map do |sig|
+          key.verify(digest, Base64.strict_decode64(sig), signed)
+        end.any?
+      end.any?
+    end
+
+    def validate_signed_message
+      signed_message = @token[:signedMessage]
+      validator = Aliquot::Validator::SignedMessage.new(JSON.parse(signed_message))
+      validator.validate
+      validator.output
+    end
+
+    # Keys are derived according to the Google Pay specification.
+    def derive_keys(ephemeral_public_key, shared_secret, info)
+      input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
+
+      key_len = cipher.key_len
+
+      key_bytes = if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf)
+                    OpenSSL::KDF.hkdf(input_keying_material, hash: digest, salt: '', length: 2 * key_len, info: info)
+                  else
+                    HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(2 * key_len)
+                  end
+
+      [key_bytes[0..key_len - 1], key_bytes[key_len..2 * key_len]]
+    end
+
+    def valid_mac?(mac_key)
+      data = Base64.strict_decode64(@signed_message[:encryptedMessage])
+      tag = @signed_message[:tag]
+      mac = OpenSSL::HMAC.digest(digest, mac_key, data)
+
+      compare(Base64.strict_encode64(mac), tag)
+    end
+
+    def decrypt(key, encrypted)
+      c = cipher
+      c.key = key
+      c.decrypt
+
+      c.update(Base64.strict_decode64(encrypted)) + c.final
+    end
+
+    def validate_message
+      validator = Aliquot::Validator::EncryptedMessageValidator.new(@message)
+      validator.validate
+
+      # Output is hashed with symbolized keys.
+      validator.output
     end
 
     ##
@@ -94,37 +215,20 @@ module Aliquot
       @message[:messageExpiration].to_f / 1000.0 <= Time.now.to_f
     end
 
-    def valid_signature?
-      signed_string = ['Google', @merchant_id, protocol_version, @token[:signedMessage]].map do |str|
-        [str.length].pack('V') + str
-      end.join
-
-      keys = JSON.parse(@signing_keys)['keys']
-      # Check if signature was performed with any possible key.
-      keys.map do |key|
-        next if key['protocolVersion'] != protocol_version
-
-        ec = OpenSSL::PKey::EC.new(Base64.strict_decode64(key['keyValue']))
-        ec.verify(OpenSSL::Digest::SHA256.new, Base64.strict_decode64(@token[:signature]), signed_string)
-      end.any?
+    def cipher
+      case protocol_version
+      when 'ECv1'
+        OpenSSL::Cipher::AES128.new(:CTR)
+      when 'ECv2'
+        OpenSSL::Cipher::AES256.new(:CTR)
+      end
     end
 
-    def self.decrypt(key, encrypted)
-      c = OpenSSL::Cipher::AES128.new(:CTR)
-      c.key = key
-      c.decrypt
-
-      c.update(Base64.strict_decode64(encrypted)) + c.final
+    def digest
+      OpenSSL::Digest::SHA256.new
     end
 
-    def self.valid_mac?(mac_key, data, tag)
-      digest = OpenSSL::Digest::SHA256.new
-      mac = OpenSSL::HMAC.digest(digest, mac_key, Base64.strict_decode64(data))
-
-      compare(Base64.strict_encode64(mac), tag)
-    end
-
-    def self.compare(a, b)
+    def compare(a, b)
       return false unless a.length == b.length
 
       diffs = 0
@@ -136,32 +240,6 @@ module Aliquot
       end
 
       diffs.zero?
-    end
-
-    private
-
-    # Keys are derived according to the Google Pay specification.
-    def derive_keys(ephemeral_public_key, shared_secret, info)
-      input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
-
-      if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf)
-        h = OpenSSL::Digest::SHA256.new
-        key_bytes = OpenSSL::KDF.hkdf(input_keying_material, hash: h, salt: '', length: 32, info: info)
-      else
-        key_bytes = HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(32)
-      end
-
-      [key_bytes[0..15], key_bytes[16..32]]
-    end
-
-    def check_shared_secret
-      begin
-        decoded = Base64.strict_decode64(@shared_secret)
-      rescue
-        raise InvalidSharedSecretError, 'shared_secret must be base64'
-      end
-
-      raise InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded' unless decoded.length == 32
     end
   end
 end

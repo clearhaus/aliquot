@@ -9,7 +9,7 @@ require 'base64'
 require 'json'
 
 describe Aliquot::Payment do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
   let(:token_string) { JSON.unparse(token) }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
