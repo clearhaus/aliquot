@@ -116,13 +116,7 @@ module Aliquot
       end.join
       message_signature = Base64.strict_decode64(@token[:signature])
 
-      root_signing_keys = JSON.parse(@signing_keys)['keys'].select do |key|
-        key['protocolVersion'] == protocol_version
-      end
-
-      root_signing_keys.map! do |key|
-        OpenSSL::PKey::EC.new(Base64.strict_decode64(key['keyValue']))
-      end
+      root_signing_keys = root_keys
 
       case protocol_version
       when 'ECv1'
@@ -157,6 +151,16 @@ module Aliquot
       # Catches problems with verifying signature. Can be caused by signature
       # being valid ASN1 but having invalid structure.
       raise InvalidSignatureError, e.message
+    end
+
+    def  root_keys
+      root_signing_keys = JSON.parse(@signing_keys)['keys'].select do |key|
+        key['protocolVersion'] == protocol_version
+      end
+
+      root_signing_keys.map! do |key|
+        OpenSSL::PKey::EC.new(Base64.strict_decode64(key['keyValue']))
+      end
     end
 
     def valid_intermediate_key_signatures?(signing_keys, signatures, signed)
