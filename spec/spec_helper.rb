@@ -28,7 +28,7 @@ def keystring
 
   ecv2_public_key = OpenSSL::PKey::EC.new(key_ecv2.group)
   ecv2_public_key.public_key = key_ecv2.public_key
-  JSON.unparse(
+  {
     'keys' => [
       {
         'keyValue'        => Base64.strict_encode64(ecv1_public_key.to_der),
@@ -38,8 +38,8 @@ def keystring
         'keyValue'        => Base64.strict_encode64(ecv2_public_key.to_der),
         'protocolVersion' => 'ECv2',
       },
-    ]
-  )
+    ],
+  }.to_json
 end
 
 def extract_shared_secret(token, recipient)

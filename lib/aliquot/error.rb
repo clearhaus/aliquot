@@ -28,4 +28,6 @@ module Aliquot
 
   # When shared_secret is invalid
   class InvalidSharedSecretError < Error; end
+
+  class InvalidMerchantIDError < Error; end
 end

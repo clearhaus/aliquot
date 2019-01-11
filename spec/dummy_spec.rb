@@ -10,7 +10,7 @@ require 'json'
 
 describe Aliquot::Payment do
   let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token_string) { token.to_json }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
 

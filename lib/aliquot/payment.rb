@@ -17,7 +17,7 @@ module Aliquot
     # Parameters:
     # token_string::  Google Pay token (JSON string)
     # shared_secret:: Base64 encoded shared secret
-    # merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
+    # merchant_id::   Google Pay merchant ID
     # signing_keys::  Signing keys fetched from Google
     def initialize(token_string, shared_secret, merchant_id,
                    signing_keys: ENV['GOOGLE_SIGNING_KEYS'])
@@ -43,12 +43,14 @@ module Aliquot
         raise Error, "supported protocol versions are #{SUPPORTED_PROTOCOL_VERSIONS.join(', ')}"
       end
 
+      @recipient_id = validate_merchant_id
+
+      check_shared_secret
+
       if protocol_version == 'ECv2'
         @intermediate_key = validate_intermediate_key
         raise InvalidSignatureError, 'intermediate certificate expired' if intermediate_key_expired?
       end
-
-      check_shared_secret
 
       check_signature
 
@@ -100,6 +102,11 @@ module Aliquot
       @intermediate_key[:keyExpiration].to_i < cur_millis
     end
 
+    def validate_merchant_id
+      raise InvalidMerchantIDError unless /[[:graph:]]/ =~ @merchant_id
+      "merchant:#{@merchant_id}"
+    end
+
     def check_shared_secret
       begin
         decoded = Base64.strict_decode64(@shared_secret)
@@ -111,7 +118,7 @@ module Aliquot
     end
 
     def check_signature
-      signed_string_message = ['Google', @merchant_id, protocol_version, @token[:signedMessage]].map do |str|
+      signed_string_message = ['Google', @recipient_id, protocol_version, @token[:signedMessage]].map do |str|
         [str.length].pack('V') + str
       end.join
       message_signature = Base64.strict_decode64(@token[:signature])

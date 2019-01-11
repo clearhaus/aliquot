@@ -5,7 +5,7 @@ require 'openssl'
 
 describe Aliquot::Payment do
   let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token_string) { token.to_json }
   let(:shared_secret) { extract_shared_secret(token, recipient) }
   let(:cipher) { OpenSSL::Cipher::AES128.new(:CTR) }
 
@@ -36,31 +36,31 @@ describe Aliquot::Payment do
 
   it 'rejects invalid encryptedMessage JSON gracefully' do
     message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
-    token = AliquotPay.generate_token_ecv1(nil, key, recipient, JSON.unparse(message))
+    token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
     shared_secret = extract_shared_secret(token, recipient)
 
-    a = Aliquot::Payment.new(JSON.unparse(token), shared_secret, merchant_id, signing_keys: keystring)
+    a = Aliquot::Payment.new(token.to_json, shared_secret, merchant_id, signing_keys: keystring)
 
     expect { a.process } .to raise_error(Aliquot::InputError, /encryptedMessage JSON invalid, /)
   end
 
   it 'fails gracefully with invalid shared secret' do
     message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
-    token = AliquotPay.generate_token_ecv1(nil, key, recipient, JSON.unparse(message))
+    token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
 
-    a = Aliquot::Payment.new(JSON.unparse(token), 'invalid shared secret', merchant_id, signing_keys: keystring)
+    a = Aliquot::Payment.new(token.to_json, 'invalid shared secret', merchant_id, signing_keys: keystring)
 
     expect { a.process } .to raise_error(Aliquot::InvalidSharedSecretError, /shared_secret must be base64/)
   end
 
   it 'catches invalid signedMessage JSON gracefully' do
     message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
-    token = AliquotPay.generate_token_ecv1(nil, key, recipient, JSON.unparse(message))
+    token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
     shared_secret = extract_shared_secret(token, recipient)
     token[:signedMessage] = 'not valid JSON'
 
     block = proc do
-      Aliquot::Payment.new(JSON.unparse(token), shared_secret, merchant_id, signing_keys: keystring)
+      Aliquot::Payment.new(token.to_json, shared_secret, merchant_id, signing_keys: keystring)
     end
 
     expect(&block).to raise_error(Aliquot::ValidationError, /signedMessage must be valid JSON/)
@@ -83,7 +83,7 @@ end
 
 describe Aliquot::Payment do
   let(:token) { AliquotPay.generate_token_ecv2(payment, key_ecv2, intermediate_key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token_string) { token.to_json }
   let(:shared_secret) { extract_shared_secret(token, recipient) }
   let(:payment) { AliquotPay.payment }
 
@@ -150,7 +150,7 @@ describe Aliquot::Payment do
     it 'rejects expired intermediate key' do
       expire_time = (Time.now.to_f - 600).round.to_s
       token = AliquotPay.generate_token_ecv2(payment, key_ecv2, intermediate_key, recipient, expire_time: expire_time)
-      token_string = JSON.unparse(token)
+      token_string = token.to_json
       shared_secret = extract_shared_secret(token, recipient)
       a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, signing_keys: keystring)
 
