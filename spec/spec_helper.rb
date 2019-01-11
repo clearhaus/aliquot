@@ -14,17 +14,32 @@ def key
   @key ||= OpenSSL::PKey::EC.new('prime256v1').generate_key
 end
 
+def key_ecv2
+  @key_ecv2 ||= OpenSSL::PKey::EC.new('prime256v1').generate_key
+end
+
+def intermediate_key
+  @intermediate_key ||= OpenSSL::PKey::EC.new('prime256v1').generate_key
+end
+
 def keystring
-  public_key = OpenSSL::PKey::EC.new(key.group)
-  public_key.public_key = key.public_key
-  JSON.unparse(
+  ecv1_public_key = OpenSSL::PKey::EC.new(key.group)
+  ecv1_public_key.public_key = key.public_key
+
+  ecv2_public_key = OpenSSL::PKey::EC.new(key_ecv2.group)
+  ecv2_public_key.public_key = key_ecv2.public_key
+  {
     'keys' => [
       {
-        'keyValue'        => Base64.strict_encode64(public_key.to_der),
+        'keyValue'        => Base64.strict_encode64(ecv1_public_key.to_der),
         'protocolVersion' => 'ECv1',
       },
-    ]
-  )
+      {
+        'keyValue'        => Base64.strict_encode64(ecv2_public_key.to_der),
+        'protocolVersion' => 'ECv2',
+      },
+    ],
+  }.to_json
 end
 
 def extract_shared_secret(token, recipient)

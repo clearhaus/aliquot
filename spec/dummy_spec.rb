@@ -1,4 +1,5 @@
 require 'aliquot'
+require 'aliquot/payment'
 
 require 'aliquot-pay'
 
@@ -8,8 +9,8 @@ require 'base64'
 require 'json'
 
 describe Aliquot::Payment do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
+  let(:token_string) { token.to_json }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
 
@@ -35,7 +36,7 @@ describe Aliquot::Payment do
 
   it 'rejects expired token' do
     @payment = AliquotPay.payment(expiration: ((Time.now.to_f - 1) * 1000).round.to_s)
-    is_expected.to raise_error(Aliquot::ExpiredException)
+    is_expected.to raise_error(Aliquot::TokenExpiredError)
   end
 
   it 'it fails validation on invalid merchant_id' do

@@ -1,9 +1,11 @@
 require 'aliquot/error'
 require 'spec_helper'
 
+require 'json'
+
 describe Aliquot::Validator::TokenSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
+  let(:token_string) { token.to_json }
 
   subject do
     lambda do
@@ -38,12 +40,14 @@ describe Aliquot::Validator::TokenSchema do
       ['not JSON',   /signedMessage[^\w]+must be valid JSON/],
     ].each do |sig, msg|
       it "when message is '#{sig}'" do
-        @payment = AliquotPay.payment
-        token['signedMessage'] = sig
-        a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
-                                 signing_keys: keystring)
+        expect do
+          @payment = AliquotPay.payment
+          token['signedMessage'] = sig
+          a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+                                   signing_keys: keystring)
 
-        expect { a.process }.to raise_error(Aliquot::ValidationError, msg)
+          a.process
+        end.to raise_error(Aliquot::ValidationError, msg)
       end
     end
   end
@@ -59,12 +63,13 @@ describe Aliquot::Validator::SignedMessageSchema do
     }
   end
 
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient, message) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient, message.to_json) }
+  let(:token_string) { token.to_json }
+  let(:dummy_shared_secret) { Base64.strict_encode64(Random.new.bytes(32)) }
 
   subject do
     lambda do
-      a = Aliquot::Payment.new(token_string, 'no_secret', merchant_id,
+      a = Aliquot::Payment.new(token_string, dummy_shared_secret, merchant_id,
                                signing_keys: keystring)
       a.process
     end
@@ -111,8 +116,8 @@ describe Aliquot::Validator::SignedMessageSchema do
 end
 
 describe Aliquot::Validator::EncryptedMessageSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
+  let(:token_string) { token.to_json }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
 
@@ -164,8 +169,8 @@ describe Aliquot::Validator::EncryptedMessageSchema do
 end
 
 describe Aliquot::Validator::PaymentMethodDetailsSchema do
-  let(:token) { AliquotPay.generate_token(@payment, key, recipient) }
-  let(:token_string) { JSON.unparse(token) }
+  let(:token) { AliquotPay.generate_token_ecv1(@payment, key, recipient) }
+  let(:token_string) { token.to_json }
 
   let(:shared_secret) { extract_shared_secret(token, recipient) }
 
