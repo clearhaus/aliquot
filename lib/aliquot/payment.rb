@@ -144,6 +144,7 @@ module Aliquot
 
         intermediate_signatures = @token[:intermediateSigningKey][:signatures]
 
+        # Check that a root signing key signed the intermediate
         success = valid_intermediate_key_signatures?(
           root_signing_keys,
           intermediate_signatures,
@@ -152,6 +153,10 @@ module Aliquot
 
         raise InvalidSignatureError, 'intermediate not signed' unless success
       end
+    rescue OpenSSL::PKey::PKeyError => e
+      # Catches problems with verifying signature. Can be caused by signature
+      # being valid ASN1 but having invalid structure.
+      raise InvalidSignatureError, e.message
     end
 
     def valid_intermediate_key_signatures?(signing_keys, signatures, signed)

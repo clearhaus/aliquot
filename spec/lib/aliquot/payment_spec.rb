@@ -66,9 +66,19 @@ describe Aliquot::Payment do
     expect(&block).to raise_error(Aliquot::ValidationError, /signedMessage must be valid JSON/)
   end
 
+  it 'handles decryption error succesfully' do
+    name = OpenSSL::ASN1::PrintableString.new('not a signature')
+    asn1 = OpenSSL::ASN1::Sequence.new([name])
+    der  = asn1.to_der
+
+    @payment = AliquotPay.payment
+    token['signature'] = Base64.strict_encode64(der)
+    a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, signing_keys: keystring)
+    expect { a.process }.to raise_error(Aliquot::InvalidSignatureError, /nested asn1 error/)
+  end
+
   # KSE: I can't figure out how to provoke an error the following cases
   it 'fails to derive keys gracefully'
-  it 'handles decryption error succesfully'
 end
 
 describe Aliquot::Payment do
