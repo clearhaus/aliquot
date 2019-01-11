@@ -129,7 +129,7 @@ module Aliquot
         # Check if signature was performed directly with any possible key.
         success =
           root_signing_keys.map do |key|
-            key.verify(digest, message_signature, signed_string_message)
+            key.verify(new_digest, message_signature, signed_string_message)
           end.any?
 
         raise InvalidSignatureError unless success
@@ -140,7 +140,7 @@ module Aliquot
 
         # Check that the intermediate key signed the message
         pkey = OpenSSL::PKey::EC.new(Base64.strict_decode64(@intermediate_key[:keyValue]))
-        raise InvalidSignatureError, 'intermediate did not sign message' unless pkey.verify(digest, message_signature, signed_string_message)
+        raise InvalidSignatureError, 'intermediate did not sign message' unless pkey.verify(new_digest, message_signature, signed_string_message)
 
         intermediate_signatures = @token[:intermediateSigningKey][:signatures]
 
@@ -157,7 +157,7 @@ module Aliquot
     def valid_intermediate_key_signatures?(signing_keys, signatures, signed)
       signing_keys.map do |key|
         signatures.map do |sig|
-          key.verify(digest, Base64.strict_decode64(sig), signed)
+          key.verify(new_digest, Base64.strict_decode64(sig), signed)
         end.any?
       end.any?
     end
@@ -173,10 +173,10 @@ module Aliquot
     def derive_keys(ephemeral_public_key, shared_secret, info)
       input_keying_material = Base64.strict_decode64(ephemeral_public_key) + Base64.strict_decode64(shared_secret)
 
-      key_len = cipher.key_len
+      key_len = new_cipher.key_len
 
       key_bytes = if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf)
-                    OpenSSL::KDF.hkdf(input_keying_material, hash: digest, salt: '', length: 2 * key_len, info: info)
+                    OpenSSL::KDF.hkdf(input_keying_material, hash: new_digest, salt: '', length: 2 * key_len, info: info)
                   else
                     HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(2 * key_len)
                   end
@@ -187,13 +187,13 @@ module Aliquot
     def valid_mac?(mac_key)
       data = Base64.strict_decode64(@signed_message[:encryptedMessage])
       tag = @signed_message[:tag]
-      mac = OpenSSL::HMAC.digest(digest, mac_key, data)
+      mac = OpenSSL::HMAC.digest(new_digest, mac_key, data)
 
       compare(Base64.strict_encode64(mac), tag)
     end
 
     def decrypt(key, encrypted)
-      c = cipher
+      c = new_cipher
       c.key = key
       c.decrypt
 
@@ -215,7 +215,7 @@ module Aliquot
       @message[:messageExpiration].to_f / 1000.0 <= Time.now.to_f
     end
 
-    def cipher
+    def new_cipher
       case protocol_version
       when 'ECv1'
         OpenSSL::Cipher::AES128.new(:CTR)
@@ -224,7 +224,7 @@ module Aliquot
       end
     end
 
-    def digest
+    def new_digest
       OpenSSL::Digest::SHA256.new
     end
 
