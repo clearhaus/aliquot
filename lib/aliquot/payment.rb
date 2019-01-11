@@ -160,11 +160,10 @@ module Aliquot
     end
 
     def valid_intermediate_key_signatures?(signing_keys, signatures, signed)
-      signing_keys.map do |key|
-        signatures.map do |sig|
-          key.verify(new_digest, Base64.strict_decode64(sig), signed)
-        end.any?
-      end.any?
+      signing_keys.product(signatures).each do |key, sig|
+        return true if key.verify(new_digest, Base64.strict_decode64(sig), signed)
+      end
+      false
     end
 
     def validate_signed_message
