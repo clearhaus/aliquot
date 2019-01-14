@@ -35,7 +35,7 @@ describe Aliquot::Payment do
   end
 
   it 'rejects invalid encryptedMessage JSON gracefully' do
-    message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
+    message = AliquotPay.encrypt('Invalid JSON', recipient, :ECv1)
     token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
     shared_secret = extract_shared_secret(token, recipient)
 
@@ -45,7 +45,7 @@ describe Aliquot::Payment do
   end
 
   it 'fails gracefully with invalid shared secret' do
-    message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
+    message = AliquotPay.encrypt('Invalid JSON', recipient, :ECv1)
     token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
 
     a = Aliquot::Payment.new(token.to_json, 'invalid shared secret', merchant_id, signing_keys: keystring)
@@ -54,7 +54,7 @@ describe Aliquot::Payment do
   end
 
   it 'catches invalid signedMessage JSON gracefully' do
-    message = AliquotPay.encrypt('Invalid JSON', recipient, cipher)
+    message = AliquotPay.encrypt('Invalid JSON', recipient, :ECv1)
     token = AliquotPay.generate_token_ecv1(nil, key, recipient, message.to_json)
     shared_secret = extract_shared_secret(token, recipient)
     token[:signedMessage] = 'not valid JSON'
