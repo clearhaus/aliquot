@@ -30,7 +30,7 @@ describe Aliquot::Payment do
       Aliquot::Payment.new('invalid JSON', shared_secret, merchant_id, signing_keys: keystring)
     end
 
-    expect(&block).to raise_error(Aliquot::InputError, /invalid token JSON, .+/)
+    expect(&block).to raise_error(Aliquot::InputError, /token JSON is invalid, .+/)
   end
 
   it 'rejects invalid encryptedMessage JSON gracefully' do
@@ -40,7 +40,7 @@ describe Aliquot::Payment do
 
     a = Aliquot::Payment.new(token.to_json, shared_secret, merchant_id, signing_keys: keystring)
 
-    expect { a.process } .to raise_error(Aliquot::InputError, /invalid encryptedMessage JSON, /)
+    expect { a.process } .to raise_error(Aliquot::InputError, /encryptedMessage JSON is invalid, /)
   end
 
   it 'fails gracefully with invalid shared secret' do
@@ -133,7 +133,7 @@ describe Aliquot::Payment do
       token['intermediateSigningKey']['signatures'] = [invalid_signature]
 
       a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, signing_keys: keystring)
-      expect { a.process }.to raise_error(Aliquot::InvalidSignatureError, /no valid signature of intermediate key found/)
+      expect { a.process }.to raise_error(Aliquot::InvalidSignatureError, /no valid signature of intermediate key/)
     end
 
     it 'ignores incorrect intermediate signatures' do
@@ -153,7 +153,7 @@ describe Aliquot::Payment do
       shared_secret = extract_shared_secret(token, recipient)
       a = Aliquot::Payment.new(token_string, shared_secret, merchant_id, signing_keys: keystring)
 
-      expect { a.process }.to raise_error(Aliquot::InvalidSignatureError, /intermediate certificate has expired/)
+      expect { a.process }.to raise_error(Aliquot::InvalidSignatureError, /intermediate certificate is expired/)
     end
   end
 end
