@@ -103,7 +103,7 @@ module Aliquot
     end
 
     def validate_merchant_id
-      raise InvalidMerchantIDError unless /[[:graph:]]/ =~ @merchant_id
+      raise InvalidMerchantIDError unless /\A[[:graph:]]+\z/ =~ @merchant_id
       "merchant:#{@merchant_id}"
     end
 
