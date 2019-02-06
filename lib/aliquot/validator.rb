@@ -127,7 +127,7 @@ module Aliquot
         method.eql?('PAN_ONLY').then(eci.none?)
       end
 
-      rule('cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
+      rule(cryptogram: %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('PAN_ONLY').then(cryptogram.none?)
       end
     end
