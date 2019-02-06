@@ -4,7 +4,7 @@ require 'json'
 require 'openssl'
 
 # Test that all `raise` errors are caught and handled gracefully.
-# Ordered by occurence of raise in the `payment.rb` source code.
+# Ordered by occurrence of raise in the `payment.rb` source code.
 
 shared_examples Aliquot::Payment do
 
@@ -30,9 +30,9 @@ shared_examples Aliquot::Payment do
   end
 
   # KSE: Don't know how to trigger this.
-  it 'fails deriving keys gracefully'
+  it 'fails gracefully when deriving keys'
 
-  it 'fails gracefully when when MAC is invalid' do
+  it 'fails gracefully when MAC is invalid' do
     generator.tag = Base64.strict_encode64(Random.new.bytes(32))
     is_expected.to raise_error(Aliquot::InvalidMacError, 'MAC does not match')
   end
