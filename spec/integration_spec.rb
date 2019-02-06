@@ -38,7 +38,7 @@ describe Aliquot::Payment do
   let (:token) { generator.token }
 
   subject do
-    -> do Aliquot::Payment.new(generator.token.to_json,
+    -> do Aliquot::Payment.new(token.to_json,
                                generator.shared_secret,
                                generator.merchant_id,
                                signing_keys: generator.extract_root_signing_keys)
