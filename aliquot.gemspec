@@ -16,6 +16,6 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'excon',          '~> 0'
   s.add_runtime_dependency 'hkdf',           '~> 0'
 
-  s.add_development_dependency 'aliquot-pay', '~> 0.13.0'
+  s.add_development_dependency 'aliquot-pay', '~> 1.0.0'
   s.add_development_dependency 'rspec',       '~> 3'
 end
