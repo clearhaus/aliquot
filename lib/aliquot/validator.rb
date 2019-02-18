@@ -22,6 +22,7 @@ module Aliquot
         month?:           'must be a month (1..12)',
         year?:            'must be a year (2000..3000)',
         base64_asn1?:     'must be base64 encoded asn1 value',
+        json_object?:     'must be a JSON object',
 
         authMethodCryptogram3DS: 'authMethod CRYPTOGRAM_3DS requires eciIndicator',
         authMethodCard:          'eciIndicator/cryptogram must be omitted when PAN_ONLY',
@@ -64,6 +65,8 @@ module Aliquot
       predicate(:year?) { |x| x.between?(2000, 3000) }
 
       predicate(:base64_asn1?) { |x| OpenSSL::ASN1.decode(Base64.strict_decode64(x)) rescue false }
+
+      predicate(:json_object?) { |x| hash?(x) }
     end
 
     # Base for DRY-Validation schemas used in Aliquot.
@@ -78,7 +81,6 @@ module Aliquot
     IntermediateSigningKeySchema = Dry::Validation.Schema(BaseSchema) do
       required(:signedKey).filled(:str?, :json_string?)
 
-      # TODO: Check if elements of array are valid signatures
       required(:signatures).filled(:array?) { each { base64? & base64_asn1? } }
     end
 
@@ -91,21 +93,19 @@ module Aliquot
     TokenSchema = Dry::Validation.Schema(BaseSchema) do
       required(:signature).filled(:str?, :base64?, :base64_asn1?)
 
-      # Currently supposed to be ECv1, but may evolve.
-      required(:protocolVersion).filled(:str?)
+      required(:protocolVersion).filled(:str?).when(eql?: 'ECv2') do
+        required(:intermediateSigningKey)
+      end
+
       required(:signedMessage).filled(:str?, :json_string?)
 
-      optional(:intermediateSigningKey).schema(IntermediateSigningKeySchema)
-
-      rule('ECv2 implies intermediateSigningKey': %i[protocolVersion intermediateSigningKey]) do |version, intermediatekey|
-        version.eql?('ECv2') > intermediatekey.filled?
-      end
+      optional(:intermediateSigningKey).value(:json_object?) { schema(IntermediateSigningKeySchema) }
     end
 
     # DRY-Validation schema for signedMessage component Google Pay token
     SignedMessageSchema = Dry::Validation.Schema(BaseSchema) do
       required(:encryptedMessage).filled(:str?, :base64?)
-      required(:ephemeralPublicKey).filled(:str?, :base64?).value(size?: 44)
+      required(:ephemeralPublicKey).filled(:str?, :base64?)
       required(:tag).filled(:str?, :base64?)
     end
 
@@ -119,15 +119,15 @@ module Aliquot
       optional(:cryptogram).filled(:str?)
       optional(:eciIndicator).filled(:str?, :eci?)
 
-      rule('when authMethod is CRYPTOGRAM_3DS, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
-        method.eql?('CRYPTOGRAM_3DS') > cryptogram.filled?
+      rule(cryptogram: %i[authMethod cryptogram]) do |method, cryptogram|
+        method.eql?('CRYPTOGRAM_3DS') > required(:cryptogram)
       end
 
-      rule('when authMethod is PAN_ONLY, eciIndicator': %i[authMethod eciIndicator]) do |method, eci|
+      rule(eciIndicator: %i[authMethod eciIndicator]) do |method, eci|
         method.eql?('PAN_ONLY').then(eci.none?)
       end
 
-      rule('when authMethod is PAN_ONLY, cryptogram': %i[authMethod cryptogram]) do |method, cryptogram|
+      rule(cryptogram: %i[authMethod cryptogram]) do |method, cryptogram|
         method.eql?('PAN_ONLY').then(cryptogram.none?)
       end
     end
@@ -137,7 +137,7 @@ module Aliquot
       required(:messageExpiration).filled(:str?, :integer_string?)
       required(:messageId).filled(:str?)
       required(:paymentMethod).filled(:str?, eql?: 'CARD')
-      required(:paymentMethodDetails).schema(PaymentMethodDetailsSchema)
+      required(:paymentMethodDetails).value(:json_object?) { schema PaymentMethodDetailsSchema }
     end
 
     module InstanceMethods

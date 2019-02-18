@@ -26,7 +26,7 @@ module Aliquot
         validation = Aliquot::Validator::Token.new(JSON.parse(token_string))
         validation.validate
       rescue JSON::JSONError => e
-        raise InputError, "token JSON invalid, #{e.message}"
+        raise InputError, "token JSON is invalid, #{e.message}"
       end
 
       @token = validation.output
@@ -49,7 +49,7 @@ module Aliquot
 
       if protocol_version == 'ECv2'
         @intermediate_key = validate_intermediate_key
-        raise InvalidSignatureError, 'intermediate certificate expired' if intermediate_key_expired?
+        raise InvalidSignatureError, 'intermediate certificate is expired' if intermediate_key_expired?
       end
 
       check_signature
@@ -59,22 +59,22 @@ module Aliquot
       begin
         aes_key, mac_key = derive_keys(@signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
       rescue => e
-        raise KeyDerivationError, "unable to derive keys, #{e.message}"
+        raise KeyDerivationError, "cannot derive keys, #{e.message}"
       end
 
-      raise InvalidMacError unless valid_mac?(mac_key)
+      raise InvalidMacError, 'MAC does not match' unless valid_mac?(mac_key)
 
       begin
         @message = JSON.parse(decrypt(aes_key, @signed_message[:encryptedMessage]))
       rescue JSON::JSONError => e
-        raise InputError, "encryptedMessage JSON invalid, #{e.message}"
+        raise InputError, "encryptedMessage JSON is invalid, #{e.message}"
       rescue => e
         raise DecryptionError, "decryption failed, #{e.message}"
       end
 
       @message = validate_message
 
-      raise TokenExpiredError if expired?
+      raise TokenExpiredError, 'token is expired' if expired?
 
       @message
     end
@@ -133,7 +133,7 @@ module Aliquot
             key.verify(new_digest, message_signature, signed_string_message)
           end.any?
 
-        raise InvalidSignatureError unless success
+        raise InvalidSignatureError, 'signature of signedMessage does not match' unless success
       when 'ECv2'
         signed_key_signature = ['Google', 'ECv2', @token[:intermediateSigningKey][:signedKey]].map do |str|
           [str.length].pack('V') + str
@@ -141,7 +141,7 @@ module Aliquot
 
         # Check that the intermediate key signed the message
         pkey = OpenSSL::PKey::EC.new(Base64.strict_decode64(@intermediate_key[:keyValue]))
-        raise InvalidSignatureError, 'intermediate did not sign message' unless pkey.verify(new_digest, message_signature, signed_string_message)
+        raise InvalidSignatureError, 'signature of signedMessage does not match' unless pkey.verify(new_digest, message_signature, signed_string_message)
 
         intermediate_signatures = @token[:intermediateSigningKey][:signatures]
 
@@ -152,12 +152,12 @@ module Aliquot
           signed_key_signature
         )
 
-        raise InvalidSignatureError, 'intermediate not signed' unless success
+        raise InvalidSignatureError, 'no valid signature of intermediate key' unless success
       end
     rescue OpenSSL::PKey::PKeyError => e
       # Catches problems with verifying signature. Can be caused by signature
       # being valid ASN1 but having invalid structure.
-      raise InvalidSignatureError, e.message
+      raise InvalidSignatureError, "error verifying signature, #{e.message}"
     end
 
     def root_keys
