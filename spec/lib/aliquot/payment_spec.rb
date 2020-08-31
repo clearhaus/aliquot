@@ -50,16 +50,16 @@ shared_examples Aliquot::Payment do
     is_expected.to raise_error(Aliquot::TokenExpiredError, 'token is expired')
   end
 
-  it 'rejects invalid merchantId' do
-    generator.merchant_id = 'Some invalid id'
-    is_expected.to raise_error(Aliquot::InvalidMerchantIDError)
+  it 'rejects invalid recipient_id' do
+    generator.recipient_id = 'Some invalid id'
+    is_expected.to raise_error(Aliquot::InvalidRecipientIDError)
   end
 
   it 'rejects non-base64 shared_secret' do
     block = proc do
       Aliquot::Payment.new(generator.token.to_json,
                        'not base64',
-                       generator.merchant_id,
+                       generator.recipient_id,
                        signing_keys: generator.extract_root_signing_keys)
         .process
     end
@@ -90,7 +90,7 @@ describe Aliquot::Payment do
   subject do
     -> do Aliquot::Payment.new(generator.token.to_json,
                                generator.shared_secret,
-                               generator.merchant_id,
+                               generator.recipient_id,
                                signing_keys: generator.extract_root_signing_keys)
         .process
     end

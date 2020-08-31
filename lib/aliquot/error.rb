@@ -29,5 +29,6 @@ module Aliquot
   # When shared_secret is invalid
   class InvalidSharedSecretError < Error; end
 
-  class InvalidMerchantIDError < Error; end
+  # When recipient_id is invalid
+  class InvalidRecipientIDError < Error; end
 end

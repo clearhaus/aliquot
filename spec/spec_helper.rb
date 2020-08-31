@@ -6,8 +6,8 @@ def recipient
   @recipient ||= OpenSSL::PKey::EC.new('prime256v1').generate_key
 end
 
-def merchant_id
-  AliquotPay::DEFAULTS[:merchant_id]
+def recipient_id
+  AliquotPay::DEFAULTS[:recipient_id]
 end
 
 def key
