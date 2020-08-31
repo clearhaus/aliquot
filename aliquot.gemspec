@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.files = Dir.glob('lib/**/*.rb')
 
   s.add_runtime_dependency 'dry-validation', '~> 0'
-  s.add_runtime_dependency 'excon',          '~> 0'
+  s.add_runtime_dependency 'excon',          '~> 0.71.0'
   s.add_runtime_dependency 'hkdf',           '~> 0'
 
   s.add_development_dependency 'aliquot-pay', '~> 1.0.0'
