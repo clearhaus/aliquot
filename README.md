@@ -10,8 +10,8 @@ For usage examples it's best to look at unit tests. As an example from `dummy_sp
 ```ruby
 # token_string::  Google Pay token (JSON string)
 # shared_secret:: Base64 encoded shared secret (EC Public key)
-# merchant_id::   Google Pay merchant ID ("merchant:<SOMETHING>")
-a = Aliquot::Payment.new(token_string, shared_secret, merchant_id)
+# recipient_id::  Google Pay recipient ID ("<PREFIX e.g. merchant>:<SOMETHING>")
+a = Aliquot::Payment.new(token_string, shared_secret, recipient_id)
 a.process
 ```
 
