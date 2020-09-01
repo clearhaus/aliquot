@@ -40,7 +40,7 @@ describe Aliquot::Payment do
   subject do
     -> do Aliquot::Payment.new(token.to_json,
                                generator.shared_secret,
-                               generator.merchant_id,
+                               generator.recipient_id,
                                signing_keys: generator.extract_root_signing_keys)
         .process
     end

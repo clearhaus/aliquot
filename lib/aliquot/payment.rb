@@ -10,16 +10,16 @@ module Aliquot
   ##
   # A Payment represents a single payment using Google Pay.
   # It is used to verify/decrypt the supplied token by using the shared secret,
-  # thus avoiding having knowledge of merchant primary keys.
+  # thus avoiding having knowledge of any private keys involved.
   class Payment
     SUPPORTED_PROTOCOL_VERSIONS = %w[ECv1 ECv2].freeze
     ##
     # Parameters:
     # token_string::  Google Pay token (JSON string)
     # shared_secret:: Base64 encoded shared secret
-    # merchant_id::   Google Pay merchant ID
+    # recipient_id::   Google Pay recipient ID
     # signing_keys::  Signing keys fetched from Google
-    def initialize(token_string, shared_secret, merchant_id,
+    def initialize(token_string, shared_secret, recipient_id,
                    signing_keys: ENV['GOOGLE_SIGNING_KEYS'])
 
       begin
@@ -32,7 +32,7 @@ module Aliquot
       @token = validation.output
 
       @shared_secret = shared_secret
-      @merchant_id   = merchant_id
+      @recipient_id   = recipient_id
       @signing_keys  = signing_keys
     end
 
@@ -43,7 +43,7 @@ module Aliquot
         raise Error, "supported protocol versions are #{SUPPORTED_PROTOCOL_VERSIONS.join(', ')}"
       end
 
-      @recipient_id = validate_merchant_id
+      @recipient_id = validate_recipient_id
 
       check_shared_secret
 
@@ -102,9 +102,10 @@ module Aliquot
       @intermediate_key[:keyExpiration].to_i < cur_millis
     end
 
-    def validate_merchant_id
-      raise InvalidMerchantIDError unless /\A[[:graph:]]+\z/ =~ @merchant_id
-      "merchant:#{@merchant_id}"
+    def validate_recipient_id
+      raise InvalidRecipientIDError, 'recipient_id must be alphanumeric and punctuation' unless /\A[[:graph:]]+\z/ =~ @recipient_id
+
+      @recipient_id
     end
 
     def check_shared_secret
