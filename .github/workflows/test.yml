@@ -1,0 +1,27 @@
+name: Test
+on:
+  - push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version:
+          - 2.3 # Debian Stretch
+          # - 2.5 # Debian Buster
+          # - 2.7 # Debian Bullseye
+          # - 3.0 # Debian Bookworm
+    steps:
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.version }}
+
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Install Gems
+        run: bundle install
+
+      - name: Execute tests
+        run: bundle exec rspec
