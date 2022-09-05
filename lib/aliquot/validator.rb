@@ -10,7 +10,7 @@ module Aliquot
     # Verified according to:
     # https://developers.google.com/pay/api/web/guides/resources/payment-data-cryptography#payment-method-token-structure
 
-    CUSTOM_PREDICATE_ERRORS = {
+    CUSTOM_ERRORS = {
       base64?:         'must be Base64',
       pan?:            'must be a PAN',
       ec_public_key?:  'must be an EC public key',
@@ -26,16 +26,16 @@ module Aliquot
     }.freeze
 
     def self.base64_check(value)
-      /\A[=A-Za-z0-9+\/]*\z/.match?(value) &&
-        value.length.remainder(4).zero? &&
-        !/=[^$=]/.match?(value) &&
-        !/===/.match?(value)
+      /\A[=A-Za-z0-9+\/]*\z/.match?(value) && # allowable chars
+        value.length.remainder(4).zero? && # multiple of 4
+        !/=[^$=]/.match?(value) && # may only end with ='s
+        !/===/.match?(value) # at most 2 ='s
     end
 
     Dry::Validation.register_macro(:base64?) do
       if key?
         unless Aliquot::Validator.base64_check(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:base64?])
+          key.failure(CUSTOM_ERRORS[:base64?])
         end
       end
     end
@@ -47,7 +47,7 @@ module Aliquot
     Dry::Validation.register_macro(:base64_asn1?) do
       if key?
         unless Aliquot::Validator.ans1_check(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:base64_asn1?])
+          key.failure(CUSTOM_ERRORS[:base64_asn1?])
         end
       end
     end
@@ -55,7 +55,7 @@ module Aliquot
     Dry::Validation.register_macro(:pan?) do
       if key?
         unless /\A[1-9][0-9]{11,18}\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:pan?])
+          key.failure(CUSTOM_ERRORS[:pan?])
         end
       end
     end
@@ -65,7 +65,7 @@ module Aliquot
         begin
           OpenSSL::PKey::EC.new(Base64.decode64(value)).check_key
         rescue
-          key.failure(CUSTOM_PREDICATE_ERRORS[:ec_public_key?])
+          key.failure(CUSTOM_ERRORS[:ec_public_key?])
         end
       end
     end
@@ -73,7 +73,7 @@ module Aliquot
     Dry::Validation.register_macro(:eci?) do
       if key?
         unless /\A\d{1,2}\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:eci?])
+          key.failure(CUSTOM_ERRORS[:eci?])
         end
       end
     end
@@ -81,7 +81,7 @@ module Aliquot
     Dry::Validation.register_macro(:integer_string?) do
       if key?
         unless /\A\d+\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:integer_string?])
+          key.failure(CUSTOM_ERRORS[:integer_string?])
         end
       end
     end
@@ -89,14 +89,14 @@ module Aliquot
     Dry::Validation.register_macro(:json?) do
       if key?
         json = JSON.parse(value) rescue false
-        key.failure(CUSTOM_PREDICATE_ERRORS[:json?]) unless json
+        key.failure(CUSTOM_ERRORS[:json?]) unless json
       end
     end
 
     Dry::Validation.register_macro(:month?) do
       if key?
         unless value.between?(1, 12)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:month?])
+          key.failure(CUSTOM_ERRORS[:month?])
         end
       end
     end
@@ -104,7 +104,7 @@ module Aliquot
     Dry::Validation.register_macro(:year?) do
       if key?
         unless value.between?(2000, 3000)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:year?])
+          key.failure(CUSTOM_ERRORS[:year?])
         end
       end
     end
@@ -141,7 +141,7 @@ module Aliquot
         required(:signature).filled(:str?)
         required(:signedMessage).filled(:str?)
         required(:protocolVersion).filled(:str?)
-        optional(:intermediateSigningKey).filled(:hash?).schema(IntermediateSigningKeyContract.new.schema)
+        optional(:intermediateSigningKey).hash(IntermediateSigningKeyContract.new.schema)
       end
       rule(:signature).validate(:base64?, :base64_asn1?)
       rule(:signedMessage).validate(:json?)
@@ -223,7 +223,7 @@ module Aliquot
 
       def validate
         @validation ||= @schema.call(@input)
-        @output = @validation.values.data
+        @output = @validation.to_h
         return true if @validation.success?
         raise Aliquot::ValidationError, "validation error(s), #{errors_formatted}"
       end
