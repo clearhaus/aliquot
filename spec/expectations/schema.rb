@@ -9,7 +9,7 @@ RSpec::Matchers.define :satisfy_schema do |expected|
   failure_message do
     <<~EOM
       expected that the given hash satisfy the schema, but:
-        #{@check.pretty_inspect}
+        #{@check}
     EOM
   end
 end
@@ -42,9 +42,9 @@ RSpec::Matchers.define :dissatisfy_schema do |expected, mismatch|
   failure_message do
     <<~EOM
       expected that the given hash unsatisfy the schema this way:
-        #{@mismatches.pretty_inspect}
+        #{@mismatches}
       but got:
-        #{@errors.pretty_inspect}
+        #{@errors}
     EOM
   end
 end

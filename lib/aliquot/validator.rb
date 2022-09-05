@@ -5,24 +5,26 @@ require 'dry-validation'
 require 'json'
 require 'openssl'
 
+require 'pry'
+
 module Aliquot
   module Validator
     # Verified according to:
     # https://developers.google.com/pay/api/web/guides/resources/payment-data-cryptography#payment-method-token-structure
 
     CUSTOM_PREDICATE_ERRORS = {
-      is_base64: 'must be Base64',
-      is_pan: 'must be a pan',
-      is_ec_public_key: 'must be an EC public key',
-      is_eci: 'must be an ECI',
-      is_integer_string: 'must be string encoded integer',
-      is_month: 'must be a month (1..12)',
-      is_year: 'must be a year (2000..3000)',
-      is_base64_asn1: 'must be base64 encoded asn1 value',
-      is_json: 'must be valid JSON',
+      base64?:         'must be Base64',
+      pan?:            'must be a PAN',
+      ec_public_key?:  'must be an EC public key',
+      eci?:            'must be an ECI',
+      integer_string?: 'must be string encoded integer',
+      month?:          'must be a month (1..12)',
+      year?:           'must be a year (2000..3000)',
+      base64_asn1?:    'must be base64-encoded ANS.1 value',
+      json?:           'must be valid JSON',
 
       is_authMethodCryptogram3DS: 'authMethod CRYPTOGRAM_3DS requires eciIndicator',
-      is_authMethodCard: 'eciIndicator/cryptogram must be omitted when PAN_ONLY',
+      is_authMethodCard:          'eciIndicator/cryptogram must be omitted when PAN_ONLY',
     }.freeze
 
     def self.base64_check(value)
@@ -32,10 +34,10 @@ module Aliquot
         !/===/.match?(value)
     end
 
-    Dry::Validation.register_macro(:is_base64) do
+    Dry::Validation.register_macro(:base64?) do
       if key?
         unless Aliquot::Validator.base64_check(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_base64])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:base64?])
         end
       end
     end
@@ -44,68 +46,67 @@ module Aliquot
       OpenSSL::ASN1.decode(Base64.strict_decode64(value)) rescue false
     end
 
-    Dry::Validation.register_macro(:is_base64_asn1) do
+    Dry::Validation.register_macro(:base64_asn1?) do
       if key?
         unless Aliquot::Validator.ans1_check(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_base64_asn1])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:base64_asn1?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_pan) do
+    Dry::Validation.register_macro(:pan?) do
       if key?
         unless /\A[1-9][0-9]{11,18}\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_pan])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:pan?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_ec_public_key) do
+    Dry::Validation.register_macro(:ec_public_key?) do
       if key?
-        ec = -> () { OpenSSL::PKey::EC.new(Base64.decode64(value)).check_key rescue false }.call
-        unless :is_base64 && ec
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_ec_public_key])
+        begin
+          OpenSSL::PKey::EC.new(Base64.decode64(value)).check_key
+        rescue
+          key.failure(CUSTOM_PREDICATE_ERRORS[:ec_public_key?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_eci) do
+    Dry::Validation.register_macro(:eci?) do
       if key?
         unless /\A\d{1,2}\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_eci])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:eci?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_integer_string) do
+    Dry::Validation.register_macro(:integer_string?) do
       if key?
         unless /\A\d+\z/.match?(value)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_integer_string])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:integer_string?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_json) do
+    Dry::Validation.register_macro(:json?) do
       if key?
-        is_json = -> () { !!JSON.parse(value) rescue false }.call
-        unless is_json
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_json])
-        end
+        json = JSON.parse(value) rescue false
+        key.failure(CUSTOM_PREDICATE_ERRORS[:json?]) unless json
       end
     end
 
-    Dry::Validation.register_macro(:is_month) do
+    Dry::Validation.register_macro(:month?) do
       if key?
         unless value.between?(1, 12)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_month])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:month?])
         end
       end
     end
 
-    Dry::Validation.register_macro(:is_year) do
+    Dry::Validation.register_macro(:year?) do
       if key?
         unless value.between?(2000, 3000)
-          key.failure(CUSTOM_PREDICATE_ERRORS[:is_year])
+          key.failure(CUSTOM_PREDICATE_ERRORS[:year?])
         end
       end
     end
@@ -115,9 +116,10 @@ module Aliquot
         required(:keyExpiration).filled(:str?)
         required(:keyValue).filled(:str?)
       end
-      rule(:keyExpiration).validate(:is_integer_string)
-      rule(:keyValue).validate(:is_ec_public_key)
+      rule(:keyExpiration).validate(:integer_string?)
+      rule(:keyValue).validate(:ec_public_key?)
     end
+
     SignedKeySchema = SignedKeyContract.new
 
     # Schema used for the 'intermediateSigningKey' hash included in ECv2.
@@ -126,12 +128,13 @@ module Aliquot
         required(:signedKey).filled(:str?)
         required(:signatures).array(:str?)
       end
-      rule(:signedKey).validate(:is_json)
+      rule(:signedKey).validate(:json?)
       rule(:signatures).each do
         key.failure('must be Base64') unless Aliquot::Validator.base64_check(value) &&
           Aliquot::Validator.ans1_check(value)
       end
     end
+
     IntermediateSigningKeySchema = IntermediateSigningKeyContract.new
 
     # DRY-Validation schema for Google Pay token
@@ -142,20 +145,15 @@ module Aliquot
         required(:protocolVersion).filled(:str?)
         optional(:intermediateSigningKey).filled(:hash?).schema(IntermediateSigningKeyContract.new.schema)
       end
-      rule(:signature).validate(:is_base64, :is_base64_asn1)
-      rule(:signedMessage).validate(:is_json)
+      rule(:signature).validate(:base64?, :base64_asn1?)
+      rule(:signedMessage).validate(:json?)
 
-      # Old rule:
-      # required(:protocolVersion).filled(:str?).when(eql?: 'ECv2') do
-      #   required(:intermediateSigningKey)
-      # end
-      #
-      # if :protocolVersion is 'ECv2' => require :intermediateSigningKey
       rule(:intermediateSigningKey) do
         key.failure('is missing') if 'ECv2'.eql?(values[:protocolVersion]) &&
           values[:intermediateSigningKey].nil?
       end
     end
+
     TokenSchema = TokenContract.new
 
     # DRY-Validation schema for signedMessage component Google Pay token
@@ -165,10 +163,11 @@ module Aliquot
         required(:ephemeralPublicKey).filled(:str?)
         required(:tag).filled(:str?)
       end
-      rule(:encryptedMessage).validate(:is_base64)
-      rule(:ephemeralPublicKey).validate(:is_base64)
-      rule(:tag).validate(:is_base64)
+      rule(:encryptedMessage).validate(:base64?)
+      rule(:ephemeralPublicKey).validate(:base64?)
+      rule(:tag).validate(:base64?)
     end
+
     SignedMessageSchema = SignedMessageContract.new
 
     # DRY-Validation schema for paymentMethodDetails component Google Pay token
@@ -182,44 +181,27 @@ module Aliquot
         optional(:cryptogram).filled(:str?)
         optional(:eciIndicator).filled(:str?)
       end
-      rule(:pan).validate(:is_integer_string, :is_pan)
-      rule(:expirationMonth).validate(:is_month)
-      rule(:expirationYear).validate(:is_year)
-      rule(:eciIndicator).validate(:is_eci)
+      rule(:pan).validate(:integer_string?, :pan?)
+      rule(:expirationMonth).validate(:month?)
+      rule(:expirationYear).validate(:year?)
+      rule(:eciIndicator).validate(:eci?)
 
-      # Old rule:
-      # rule(cryptogram: %i[authMethod cryptogram]) do |method, cryptogram|
-      #   method.eql?('CRYPTOGRAM_3DS') > required(:cryptogram)
-      # end
-      #
-      # if :authMethod is 'CRYPTOGRAM_3DS' => require :cryptogram
       rule(:cryptogram) do
         key.failure('is missing') if 'CRYPTOGRAM_3DS'.eql?(values[:authMethod]) &&
           values[:cryptogram].nil?
       end
 
-      # Old rule:
-      # rule(cryptogram: %i[authMethod cryptogram]) do |method, cryptogram|
-      #   method.eql?('PAN_ONLY').then(cryptogram.none?)
-      # end
-      #
-      # if :authMethod is 'PAN_ONLY' => no :cryptogram
       rule(:cryptogram) do
         key.failure('cannot be defined') if 'PAN_ONLY'.eql?(values[:authMethod]) &&
           !values[:cryptogram].nil?
       end
 
-      # Old rule:
-      # rule(eciIndicator: %i[authMethod eciIndicator]) do |method, eci|
-      #   method.eql?('PAN_ONLY').then(eci.none?)
-      # end
-      #
-      # if :authMethod is 'PAN_ONLY' => no :eciIndicator
       rule(:eciIndicator) do
         key.failure('cannot be defined') if 'PAN_ONLY'.eql?(values[:authMethod]) &&
           !values[:eciIndicator].nil?
       end
     end
+
     PaymentMethodDetailsSchema = PaymentMethodDetailsContract.new
 
     # DRY-Validation schema for encryptedMessage component Google Pay token
@@ -230,11 +212,12 @@ module Aliquot
         required(:paymentMethod).filled(:str?)
         required(:paymentMethodDetails).filled(:hash).schema(PaymentMethodDetailsContract.schema)
       end
-      rule(:messageExpiration).validate(:is_integer_string)
+      rule(:messageExpiration).validate(:integer_string?)
       rule(:paymentMethod) do
         key.failure('must be equal to CARD') unless 'CARD'.eql?(value)
       end
     end
+
     EncryptedMessageSchema = EncryptedMessageContract.new
 
     module InstanceMethods
@@ -273,7 +256,9 @@ module Aliquot
     # Class for validating a Google Pay token
     class Token
       include InstanceMethods
+
       class Error < ::Aliquot::Error; end
+
       def initialize(input)
         @input = input
         @schema = TokenSchema
@@ -283,7 +268,9 @@ module Aliquot
     # Class for validating the SignedMessage component of a Google Pay token
     class SignedMessage
       include InstanceMethods
+
       class Error < ::Aliquot::Error; end
+
       def initialize(input)
         @input = input
         @schema = SignedMessageSchema
@@ -293,7 +280,9 @@ module Aliquot
     # Class for validating the encryptedMessage component of a Google Pay token
     class EncryptedMessageValidator
       include InstanceMethods
+
       class Error < ::Aliquot::Error; end
+
       def initialize(input)
         @input = input
         @schema = EncryptedMessageSchema
@@ -302,7 +291,9 @@ module Aliquot
 
     class SignedKeyValidator
       include InstanceMethods
+
       class Error < ::Aliquot::Error; end
+
       def initialize(input)
         @input = input
         @schema = SignedKeySchema

@@ -36,7 +36,7 @@ shared_examples 'Validator Spec' do
 
       it 'must be asn1' do
         generator.signature = Base64.strict_encode64('base64')
-        is_expected.to dissatisfy_schema(schema, {signature: ['must be base64 encoded asn1 value']})
+        is_expected.to dissatisfy_schema(schema, {signature: ['must be base64-encoded ANS.1 value']})
       end
     end
 
@@ -151,7 +151,7 @@ shared_examples 'Validator Spec' do
 
       it 'must be a pan' do
         generator.pan = '1121412908091872401284'
-        is_expected.to dissatisfy_schema(schema, {pan: ['must be a pan']})
+        is_expected.to dissatisfy_schema(schema, {pan: ['must be a PAN']})
       end
     end
 
