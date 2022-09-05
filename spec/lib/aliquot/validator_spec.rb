@@ -31,7 +31,7 @@ shared_examples 'Validator Spec' do
 
       it 'must be base64' do
         generator.signature = 'not base64'
-        is_expected.to dissatisfy_schema(schema, {signature: ['must be Base64']})
+        is_expected.to dissatisfy_schema(schema, {signature: ['must be Base64', 'must be base64-encoded ANS.1 value']})
       end
 
       it 'must be asn1' do
@@ -146,7 +146,7 @@ shared_examples 'Validator Spec' do
 
       it 'must be integer string' do
         generator.pan = 'no integers here'
-        is_expected.to dissatisfy_schema(schema, {pan: ['must be string encoded integer']})
+        is_expected.to dissatisfy_schema(schema, {pan: ['must be string encoded integer', 'must be a PAN']})
       end
 
       it 'must be a pan' do
@@ -362,7 +362,7 @@ describe Aliquot::Validator do
     let(:generator) { AliquotPay.new(:ECv1) }
     let(:token)     { generator.token }
     subject do
-      schema.call(input).errors
+      input
     end
 
     include_examples 'Validator Spec'
@@ -382,7 +382,7 @@ describe Aliquot::Validator do
     let(:generator) { AliquotPay.new(:ECv2) }
     let(:token)     { generator.token }
     subject do
-      schema.call(input).errors
+      input
     end
     include_examples 'Validator Spec'
 
