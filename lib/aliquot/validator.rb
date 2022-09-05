@@ -5,8 +5,6 @@ require 'dry-validation'
 require 'json'
 require 'openssl'
 
-require 'pry'
-
 module Aliquot
   module Validator
     # Verified according to:
