@@ -14,27 +14,28 @@ RSpec::Matchers.define :satisfy_schema do |expected|
   end
 end
 
-RSpec::Matchers.define :dissatisfy_schema do |expected, mismatch|
+RSpec::Matchers.define :dissatisfy_schema do |expected, mismatches|
   match do |actual|
+
     check = expected.call(actual)
-    @mismatches = mismatch
-    @errors = actual.messages
+
+    @mismatches = mismatches
+
+    @errors = check.errors.to_h
 
     return false if check.success?
 
-    return true unless mismatch
+    return true unless mismatches
 
-    key = mismatch.keys[0]
-    filtered_messages = actual.messages.select { |message| message.path[0] == key }
+    return false unless @errors.keys.include? mismatches.keys.first
 
-    return false unless filtered_messages.length > 0
+    @errors.values.each do |error|
+      return false unless mismatches.values.include? error
+    end
 
-    value = mismatch[key][0]
-    filtered_texts = (value.is_a? Array) ?
-                       filtered_messages.select { |message| message.text == value[0] } :
-                       filtered_messages.select { |message| message.text == value }
-
-    return false unless filtered_texts.length == 1
+    mismatches.values.each do |mismatch|
+      return false unless @errors.values.include? mismatch
+    end
 
     true
   end
