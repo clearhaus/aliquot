@@ -20,7 +20,7 @@ a.process
 To be sure that unit tests run properly, you can run them in a docker container.
 
 ```bash
-docker run -ti --rm -v $(pwd):/opt/aliquot ruby:2.3 bash
+docker run -ti --rm -v $(pwd):/opt/aliquot ruby:2.7.4 bash
 cd /opt/aliquot
 bundle install
 bundle exec rspec
