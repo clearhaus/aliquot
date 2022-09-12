@@ -210,8 +210,8 @@ module Aliquot
 
     def decrypt(key, encrypted)
       c = new_cipher
-      c.key = key
       c.decrypt
+      c.key = key
 
       c.update(Base64.strict_decode64(encrypted)) + c.final
     end
