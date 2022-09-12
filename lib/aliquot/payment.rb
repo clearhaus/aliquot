@@ -29,7 +29,7 @@ module Aliquot
         raise InputError, "token JSON is invalid, #{e.message}"
       end
 
-      @token = validation.output
+      @token = validation.output.to_json
 
       @shared_secret = shared_secret
       @recipient_id   = recipient_id
