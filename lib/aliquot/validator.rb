@@ -209,6 +209,7 @@ module Aliquot
         required(:messageId).filled(:str?)
         required(:paymentMethod).filled(:str?)
         required(:paymentMethodDetails).filled(:hash).schema(PaymentMethodDetailsContract.schema)
+        optional(:gatewayMerchantId).filled(:str?)
       end
       rule(:messageExpiration).validate(:integer_string?)
       rule(:paymentMethod) do
