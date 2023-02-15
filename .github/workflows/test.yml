@@ -18,7 +18,7 @@ jobs:
           ruby-version: ${{ matrix.version }}
 
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Gems
         run: bundle install
