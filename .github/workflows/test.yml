@@ -10,8 +10,8 @@ jobs:
         version:
           # - 2.3 # Debian Stretch
           # - 2.5 # Debian Buster
-           - 2.7 # Debian Bullseye
-          # - 3.0 # Debian Bookworm
+          - 2.7 # Debian Bullseye
+          - 3.0 # Debian Bookworm
     steps:
       - uses: ruby/setup-ruby@v1
         with:
