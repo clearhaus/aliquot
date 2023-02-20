@@ -8,10 +8,8 @@ jobs:
     strategy:
       matrix:
         version:
-          # - '2.3' # Debian Stretch
-          # - '2.5' # Debian Buster
-          - '2.7' # Debian Bullseye
-          - '3.0' # Debian Bookworm
+          - '2.7'
+          - '3.0'
     steps:
       - uses: ruby/setup-ruby@v1
         with:
