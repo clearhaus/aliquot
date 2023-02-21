@@ -8,17 +8,15 @@ jobs:
     strategy:
       matrix:
         version:
-          # - 2.3 # Debian Stretch
-          # - 2.5 # Debian Buster
-           - 2.7 # Debian Bullseye
-          # - 3.0 # Debian Bookworm
+          - '2.7'
+          - '3.0'
     steps:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.version }}
 
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Gems
         run: bundle install
