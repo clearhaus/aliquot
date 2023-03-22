@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
 
   s.files = Dir.glob('lib/**/*.rb')
 
-  s.required_ruby_version = '>= 2.7', '< 3.1'
+  s.required_ruby_version = '>= 2.7'
 
   s.add_runtime_dependency 'dry-validation', '~> 1.8'
   s.add_runtime_dependency 'excon',          '~> 0.71.0'
