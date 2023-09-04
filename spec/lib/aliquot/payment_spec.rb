@@ -10,13 +10,13 @@ require 'openssl'
 shared_examples Aliquot::Payment do
 
   it 'decrypts' do
-    is_expected.to_not raise_error
+    expect { subject.call }.to_not raise_error
     expect(subject.call[:paymentMethodDetails]).to include(authMethod: 'PAN_ONLY')
   end
 
   it 'decrypts with CRYPTOGRAM_3DS' do
     generator.auth_method = 'CRYPTOGRAM_3DS'
-    is_expected.to_not raise_error
+    expect { subject.call }.to_not raise_error
     expect(subject.call[:paymentMethodDetails]).to include(authMethod: 'CRYPTOGRAM_3DS')
   end
 
@@ -26,7 +26,7 @@ shared_examples Aliquot::Payment do
 
   it 'rejects invalid protocolVersion' do
     generator.token['protocolVersion'] = 'InvalidProtocolVersion'
-    is_expected.to raise_error(Aliquot::Error, 'supported protocol versions are ECv1, ECv2')
+    expect { subject.call }.to raise_error(Aliquot::Error, 'supported protocol versions are ECv1, ECv2')
   end
 
   # KSE: Don't know how to trigger this.
@@ -34,7 +34,7 @@ shared_examples Aliquot::Payment do
 
   it 'fails gracefully when MAC is invalid' do
     generator.tag = Base64.strict_encode64(Random.new.bytes(32))
-    is_expected.to raise_error(Aliquot::InvalidMacError, 'MAC does not match')
+    expect { subject.call }.to raise_error(Aliquot::InvalidMacError, 'MAC does not match')
   end
 
   # CB: Not sure how to trigger this test as JSON.parse has changed since 2.3
@@ -46,12 +46,12 @@ shared_examples Aliquot::Payment do
 
   it 'rejects expired token' do
     generator.message_expiration = (Time.now.to_f - 20).round.to_s
-    is_expected.to raise_error(Aliquot::TokenExpiredError, 'token is expired')
+    expect { subject.call }.to raise_error(Aliquot::TokenExpiredError, 'token is expired')
   end
 
   it 'rejects invalid recipient_id' do
     generator.recipient_id = 'Some invalid id'
-    is_expected.to raise_error(Aliquot::InvalidRecipientIDError)
+    expect { subject.call }.to raise_error(Aliquot::InvalidRecipientIDError)
   end
 
   it 'rejects non-base64 shared_secret' do
@@ -67,12 +67,12 @@ shared_examples Aliquot::Payment do
 
   it 'rejects shared_secret when not 32 bytes' do
     generator.shared_secret = 'not 32 bytes'
-    is_expected.to raise_error(Aliquot::InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded')
+    expect { subject.call }.to raise_error(Aliquot::InvalidSharedSecretError, 'shared_secret must be 32 bytes when base64 decoded')
   end
 
   it 'rejects when signature of signedMessage does not match' do
     generator.signature = AliquotPay.new.build_signature
-    is_expected.to raise_error(Aliquot::InvalidSignatureError, 'signature of signedMessage does not match')
+    expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'signature of signedMessage does not match')
   end
 
   it 'rejects when failing to verify signature' do
@@ -81,7 +81,7 @@ shared_examples Aliquot::Payment do
     der  = asn1.to_der
 
     generator.signature = Base64.strict_encode64(der)
-    is_expected.to raise_error(Aliquot::InvalidSignatureError, /\Aerror verifying signature,/)
+    expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, /\Aerror verifying signature,/)
   end
 end
 
@@ -108,12 +108,12 @@ describe Aliquot::Payment do
 
     it 'rejects expired intermediateSigningKey' do
       generator.key_expiration = "#{Time.now.to_i - 1}000"
-      is_expected.to raise_error(Aliquot::InvalidSignatureError, 'intermediate certificate is expired')
+      expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'intermediate certificate is expired')
     end
 
     it 'rejects when no signature of intermediateKey is found' do
       generator.signatures = AliquotPay.new.build_signatures
-      is_expected.to raise_error(Aliquot::InvalidSignatureError, 'no valid signature of intermediate key')
+      expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'no valid signature of intermediate key')
     end
 
     it 'allows invalid intermediate signatures to be present' do
@@ -125,7 +125,7 @@ describe Aliquot::Payment do
       expect(token['intermediateSigningKey']['signatures']).to include(fake_signature)
       expect(token['intermediateSigningKey']['signatures']).to include(real_signature)
 
-      is_expected.to_not raise_error
+      expect { subject.call }.to_not raise_error
     end
   end
 end

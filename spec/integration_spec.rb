@@ -9,7 +9,7 @@ shared_examples 'common integration tests' do
       e = StandardError.new('stub method')
       allow(Aliquot::Validator::Token).to receive(:new).and_raise(e)
 
-      is_expected.to raise_error(e)
+      expect { subject.call }.to raise_error(e)
 
       expect(Aliquot::Validator::Token).to have_received(:new).with(token)
     end
@@ -18,7 +18,7 @@ shared_examples 'common integration tests' do
       e = StandardError.new('stub method')
       allow(Aliquot::Validator::SignedMessage).to receive(:new).and_raise(e)
 
-      is_expected.to raise_error(e)
+      expect { subject.call }.to raise_error(e)
 
       expect(Aliquot::Validator::SignedMessage).to have_received(:new).with(generator.build_signed_message)
     end
@@ -27,7 +27,7 @@ shared_examples 'common integration tests' do
       e = StandardError.new('stub method')
       allow(Aliquot::Validator::EncryptedMessageValidator).to receive(:new).and_raise(e)
 
-      is_expected.to raise_error(e)
+      expect { subject.call }.to raise_error(e)
 
       expect(Aliquot::Validator::EncryptedMessageValidator).to have_received(:new).with(generator.build_cleartext_message)
     end
@@ -61,7 +61,7 @@ describe Aliquot::Payment do
       e = StandardError.new('stub method')
       allow(Aliquot::Validator::SignedKeyValidator).to receive(:new).and_raise(e)
 
-      is_expected.to raise_error(e)
+      expect { subject.call }.to raise_error(e)
 
       expect(Aliquot::Validator::SignedKeyValidator).to have_received(:new).with(generator.build_signed_key)
     end
