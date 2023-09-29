@@ -226,7 +226,7 @@ module Aliquot
         @validation ||= @schema.call(@input)
         @output = @validation.to_h
         return true if @validation.success?
-        raise Aliquot::ValidationError, "validation error(s), #{errors_formatted}"
+        raise Aliquot::ValidationError, "validation error(s): #{error_list.join(', ')}"
       end
 
       def valid?
@@ -241,13 +241,12 @@ module Aliquot
         @validation.errors
       end
 
-      def errors_formatted(node = [errors])
-        node.pop.flat_map do |key, value|
-          if value.is_a?(Array)
-            value.map { |error| "#{(node + [key]).join('.')} #{error}" }
-          else
-            errors_formatted(node + [key, value])
-          end
+      def error_list(node = errors.to_h, path = '')
+        if node.is_a?(Array)
+          node.map { |error| "#{path} #{error}" }
+        elsif node.is_a?(Hash)
+          path = "#{path}." unless path.empty?
+          node.flat_map { |key, sub_node| error_list(sub_node, "#{path}#{key}") }
         end
       end
     end
