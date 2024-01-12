@@ -7,19 +7,7 @@ require 'openssl'
 # Test that all `raise` errors are caught and handled gracefully.
 # Ordered by occurrence of raise in the `payment.rb` source code.
 
-shared_examples Aliquot::Payment do
-
-  it 'decrypts' do
-    expect { subject.call }.to_not raise_error
-    expect(subject.call[:paymentMethodDetails]).to include(authMethod: 'PAN_ONLY')
-  end
-
-  it 'decrypts with CRYPTOGRAM_3DS' do
-    generator.auth_method = 'CRYPTOGRAM_3DS'
-    expect { subject.call }.to_not raise_error
-    expect(subject.call[:paymentMethodDetails]).to include(authMethod: 'CRYPTOGRAM_3DS')
-  end
-
+shared_examples 'all protocol versions' do
   # CB: Not sure how to trigger this test as JSON.parse has changed since 2.3
   #     see https://clearhaus.slack.com/archives/C3LG75WE9/p1661940442665459
   it 'rejects invalid token JSON gracefully'
@@ -57,9 +45,9 @@ shared_examples Aliquot::Payment do
   it 'rejects non-base64 shared_secret' do
     block = proc do
       Aliquot::Payment.new(generator.token.to_json,
-                       'not base64',
-                       generator.recipient_id,
-                       signing_keys: generator.extract_root_signing_keys)
+                           'not base64',
+                           generator.recipient_id,
+                           signing_keys: generator.extract_root_signing_keys)
         .process
     end
     expect(&block).to raise_error(Aliquot::InvalidSharedSecretError, 'shared_secret must be base64')
@@ -85,47 +73,86 @@ shared_examples Aliquot::Payment do
   end
 end
 
+shared_examples 'only ECv2' do
+  it 'rejects expired intermediateSigningKey' do
+    generator.key_expiration = "#{Time.now.to_i - 1}000"
+    expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'intermediate certificate is expired')
+  end
+
+  it 'rejects when no signature of intermediateKey is found' do
+    generator.signatures = AliquotPay.new.build_signatures
+    expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'no valid signature of intermediate key')
+  end
+
+  it 'allows invalid intermediate signatures to be present' do
+    fake_signature = AliquotPay.new.build_signatures.first
+    real_signature = generator.build_signatures.first
+
+    generator.signatures = [fake_signature, real_signature]
+
+    expect(token['intermediateSigningKey']['signatures']).to include(fake_signature)
+    expect(token['intermediateSigningKey']['signatures']).to include(real_signature)
+
+    expect { subject.call }.to_not raise_error
+  end
+end
+
 describe Aliquot::Payment do
+  let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
   subject do
     -> do Aliquot::Payment.new(generator.token.to_json,
                                generator.shared_secret,
                                generator.recipient_id,
                                signing_keys: generator.extract_root_signing_keys)
-        .process
+            .process
     end
   end
 
-  let(:token) { generator.token }
-
   context 'ECv1' do
-    let(:generator) { AliquotPay.new(:ECv1) }
-    include_examples Aliquot::Payment
+    context 'non-tokenized' do
+      let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
+      let(:token) { generator.token }
+
+      include_examples 'all protocol versions'
+      it 'decrypts with PAN_ONLY' do
+        expect { subject.call }.to_not raise_error
+        expect(subject.call[:paymentMethodDetails]).to_not include('authMethod' => 'PAN_ONLY')
+      end
+    end
+    context 'tokenized' do
+      let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :app) }
+      let(:token) { generator.token }
+
+      include_examples 'all protocol versions'
+      it 'decrypts with 3DS' do
+        expect { subject.call }.to_not raise_error
+        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => '3DS')
+      end
+    end
   end
 
   context 'ECv2' do
-    let(:generator) { AliquotPay.new(:ECv2) }
-    include_examples Aliquot::Payment
+    context 'non-tokenized' do
+      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
+      let(:token) { generator.token }
 
-    it 'rejects expired intermediateSigningKey' do
-      generator.key_expiration = "#{Time.now.to_i - 1}000"
-      expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'intermediate certificate is expired')
+      include_examples 'all protocol versions'
+      include_examples 'only ECv2'
+      it 'decrypts' do
+        expect { subject.call }.to_not raise_error
+        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => 'PAN_ONLY')
+      end
     end
+    context 'tokenized' do
+      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :app) }
+      let(:token) { generator.token }
 
-    it 'rejects when no signature of intermediateKey is found' do
-      generator.signatures = AliquotPay.new.build_signatures
-      expect { subject.call }.to raise_error(Aliquot::InvalidSignatureError, 'no valid signature of intermediate key')
-    end
-
-    it 'allows invalid intermediate signatures to be present' do
-      fake_signature = AliquotPay.new.build_signatures.first
-      real_signature = generator.build_signatures.first
-
-      generator.signatures = [fake_signature, real_signature]
-
-      expect(token['intermediateSigningKey']['signatures']).to include(fake_signature)
-      expect(token['intermediateSigningKey']['signatures']).to include(real_signature)
-
-      expect { subject.call }.to_not raise_error
+      include_examples 'all protocol versions'
+      include_examples 'only ECv2'
+      it 'decrypts' do
+        expect { subject.call }.to_not raise_error
+        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => 'CRYPTOGRAM_3DS')
+      end
     end
   end
 end

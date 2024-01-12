@@ -10,8 +10,7 @@ require 'json'
 
 shared_examples 'Validator Spec' do
   context 'TokenSchema' do
-    let(:schema) { Aliquot::Validator::TokenSchema }
-    let(:input)  { token }
+    let(:schema) { Aliquot::Validator::TokenContract.new }
 
     context 'signature' do
       it 'must exist' do
@@ -78,213 +77,64 @@ shared_examples 'Validator Spec' do
         is_expected.to dissatisfy_schema(schema, {signedMessage: ['must be valid JSON']})
       end
     end
-  end
 
-  context 'SignedMessageScheme' do
-    let(:schema) { Aliquot::Validator::SignedMessageSchema }
-    let(:input)  { generator.build_signed_message }
+    context 'SignedMessageScheme' do
+      let(:schema) { Aliquot::Validator::SignedMessageContract.new }
+      let(:token)  { generator.build_signed_message }
 
-    context 'encryptedMessage' do
-      it 'must exist' do
-        input.delete('encryptedMessage')
-        is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['is missing']})
-      end
-
-      it 'must be filled' do
-        input['encryptedMessage'] = ''
-        is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be filled']})
-      end
-
-      it 'must be a string' do
-        generator.encrypted_message = 123
-        is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be a string']})
-      end
-
-      it 'must be base64' do
-        generator.encrypted_message = 'not base64'
-        is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be Base64']})
-      end
-    end
-
-    context 'ephemeralPublicKey' do
-      it 'must exist' do
-        input.delete('ephemeralPublicKey')
-        is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['is missing']})
-      end
-
-      it 'must be filled' do
-        input['ephemeralPublicKey'] = ''
-        is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be filled']})
-      end
-
-      it 'must be a string' do
-        generator.ephemeral_public_key = 123
-        is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be a string']})
-      end
-
-      it 'must be base64' do
-        generator.ephemeral_public_key = 'not base64'
-        is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be Base64']})
-      end
-    end
-  end
-
-  context 'PaymentMethodDetailsSchema' do
-    let(:schema) { Aliquot::Validator::PaymentMethodDetailsSchema }
-    let(:input)  { generator.build_payment_method_details }
-
-    context 'pan' do
-      it 'must exist' do
-        input.delete('pan')
-        is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
-      end
-
-      it 'must be filled' do
-        generator.pan = ''
-        is_expected.to dissatisfy_schema(schema, {pan: ['must be filled']})
-      end
-
-      it 'must be integer string' do
-        generator.pan = 'no integers here'
-        is_expected.to dissatisfy_schema(schema, {pan: ['must be string encoded integer', 'must be a PAN']})
-      end
-
-      it 'must be a pan' do
-        generator.pan = '1121412908091872401284'
-        is_expected.to dissatisfy_schema(schema, {pan: ['must be a PAN']})
-      end
-    end
-
-    context 'expirationMonth' do
-      it 'must exist' do
-        input.delete('expirationMonth')
-        is_expected.to dissatisfy_schema(schema, {expirationMonth: ['is missing']})
-      end
-
-      it 'must be filled' do
-        generator.expiration_month = ''
-        is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be filled']})
-      end
-
-      it 'must be an integer' do
-        generator.expiration_month = 'a string'
-        is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be an integer']})
-      end
-
-      it 'must be a month' do
-        generator.expiration_month = 13
-        is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be a month (1..12)']})
-      end
-    end
-
-    context 'expirationYear' do
-      it 'must exist' do
-        input.delete('expirationYear')
-        is_expected.to dissatisfy_schema(schema, {expirationYear: ['is missing']})
-      end
-
-      it 'must be filled' do
-        generator.expiration_year = ''
-        is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be filled']})
-      end
-
-      it 'must be an integer' do
-        generator.expiration_year = 'a string'
-        is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be an integer']})
-      end
-
-      it 'must be a year' do
-        generator.expiration_year = 19993
-        is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be a year (2000..3000)']})
-      end
-    end
-
-    context 'authMethod' do
-      it 'must exist' do
-        input.delete('authMethod')
-        is_expected.to dissatisfy_schema(schema, {authMethod: ['is missing']})
-      end
-
-      it 'must be filled' do
-        generator.auth_method = ''
-        is_expected.to dissatisfy_schema(schema, {authMethod: ['must be filled']})
-      end
-
-      it 'must be a string' do
-        generator.auth_method = 123
-        is_expected.to dissatisfy_schema(schema, {authMethod: ['must be a string']})
-      end
-
-      it 'must be PAN_ONLY or CRYPTOGRAM_3DS' do
-        generator.auth_method = 'INVALID_AUTH_METHOd'
-        is_expected.to dissatisfy_schema(schema, {authMethod: ['must be one of: PAN_ONLY, CRYPTOGRAM_3DS']})
-      end
-    end
-
-    context 'cryptogram' do
-      context 'when PAN_ONLY' do
-        it 'must not exist' do
-          input['cryptogram'] = '05'
-          is_expected.to dissatisfy_schema(schema, {cryptogram: ['cannot be defined']})
-        end
-      end
-
-      context 'when CRYPTOGRAM_3DS' do
-        before(:each) { generator.auth_method = 'CRYPTOGRAM_3DS' }
-
+      context 'encryptedMessage' do
         it 'must exist' do
-          input.delete('cryptogram')
-          is_expected.to dissatisfy_schema(schema, {cryptogram: ['is missing']})
+          token.delete('encryptedMessage')
+          is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['is missing']})
         end
 
         it 'must be filled' do
-          generator.cryptogram = ''
-          is_expected.to dissatisfy_schema(schema, {cryptogram: ['must be filled']})
+          token['encryptedMessage'] = ''
+          is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be filled']})
         end
 
         it 'must be a string' do
-          generator.cryptogram = 123
-          is_expected.to dissatisfy_schema(schema, {cryptogram: ['must be a string']})
+          generator.encrypted_message = 123
+          is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be a string']})
         end
-      end
-    end
 
-    context 'eciIndicator' do
-      context 'when PAN_ONLY' do
-        it 'must not exist' do
-          input['eciIndicator'] = '05'
-          is_expected.to dissatisfy_schema(schema, {eciIndicator: ['cannot be defined']})
+        it 'must be base64' do
+          generator.encrypted_message = 'not base64'
+          is_expected.to dissatisfy_schema(schema, {encryptedMessage: ['must be Base64']})
         end
       end
 
-      context 'when CRYPTOGRAM_3DS' do
-        before(:each) { generator.auth_method = 'CRYPTOGRAM_3DS' }
+      context 'ephemeralPublicKey' do
+        it 'must exist' do
+          token.delete('ephemeralPublicKey')
+          is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['is missing']})
+        end
 
-        it 'is not required' do
-          input.delete('eciIndicator')
-          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
+        it 'must be filled' do
+          token['ephemeralPublicKey'] = ''
+          is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be filled']})
         end
 
         it 'must be a string' do
-          generator.eci_indicator = 123
-          is_expected.to dissatisfy_schema(schema, {eciIndicator: ['must be a string']})
+          generator.ephemeral_public_key = 123
+          is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be a string']})
         end
 
-        it 'must be an ECI' do
-          generator.eci_indicator = 'ff'
-          is_expected.to dissatisfy_schema(schema, {eciIndicator: ['must be an ECI']})
+        it 'must be base64' do
+          generator.ephemeral_public_key = 'not base64'
+          is_expected.to dissatisfy_schema(schema, {ephemeralPublicKey: ['must be Base64']})
         end
       end
     end
   end
 
   context 'EncryptedMessageSchema' do
-    let(:schema) { Aliquot::Validator::EncryptedMessageSchema }
-    let(:input)  { generator.build_cleartext_message }
+    let(:schema) { Aliquot::Validator::EncryptedMessageContract.new }
+    let(:token)  { generator.build_cleartext_message }
 
     context 'messageExpiration' do
       it 'must exist' do
-        input.delete('messageExpiration')
+        token.delete('messageExpiration')
         is_expected.to dissatisfy_schema(schema, {messageExpiration: ['is missing']})
       end
 
@@ -306,7 +156,7 @@ shared_examples 'Validator Spec' do
 
     context 'messageId' do
       it 'must exist' do
-        input.delete('messageId')
+        token.delete('messageId')
         is_expected.to dissatisfy_schema(schema, {messageId: ['is missing']})
       end
 
@@ -323,7 +173,7 @@ shared_examples 'Validator Spec' do
 
     context 'paymentMethod' do
       it 'must exist' do
-        input.delete('paymentMethod')
+        token.delete('paymentMethod')
         is_expected.to dissatisfy_schema(schema, {paymentMethod: ['is missing']})
       end
 
@@ -337,15 +187,11 @@ shared_examples 'Validator Spec' do
         is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be a string']})
       end
 
-      it 'must be CARD' do
-        generator.payment_method = 'RANDOM'
-        is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be equal to CARD']})
-      end
     end
 
     context 'paymentMethodDetails' do
       it 'must exist' do
-        input.delete('paymentMethodDetails')
+        token.delete('paymentMethodDetails')
         is_expected.to dissatisfy_schema(schema, {paymentMethodDetails: ['is missing']})
       end
 
@@ -355,140 +201,118 @@ shared_examples 'Validator Spec' do
       end
     end
   end
-end
 
-describe Aliquot::Validator do
-  context 'ECv1' do
-    let(:generator) { AliquotPay.new(:ECv1) }
-    let(:token)     { generator.token }
-    subject do
-      input
+  context 'SignedKeySchema' do
+    let(:schema) { Aliquot::Validator::SignedKeyContract.new }
+    let(:token)  { generator.build_signed_key }
+
+    context 'keyExpiration' do
+      it 'must exist' do
+        token.delete('keyExpiration')
+        is_expected.to dissatisfy_schema(schema, {keyExpiration: ['is missing']})
+      end
+
+      it 'must be filled' do
+        token['keyExpiration'] = ''
+        is_expected.to dissatisfy_schema(schema, {keyExpiration: ['must be filled']})
+      end
+
+      it 'must be integer string' do
+        generator.key_expiration = 'not digits'
+        is_expected.to dissatisfy_schema(schema, {keyExpiration: ['must be string encoded integer']})
+      end
     end
 
-    include_examples 'Validator Spec'
+    context 'keyValue' do
+      it 'must exist' do
+        token.delete('keyValue')
+        is_expected.to dissatisfy_schema(schema, {keyValue: ['is missing']})
+      end
 
-    context 'intermediateSigningKey' do
-      let(:schema) { Aliquot::Validator::TokenSchema }
-      let(:input)  { token }
+      it 'must be filled' do
+        token['keyValue'] = ''
+        is_expected.to dissatisfy_schema(schema, {keyValue: ['must be filled']})
+      end
 
-      it 'should not be enforced' do
-        token.delete('intermediateSigningKey')
-        expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
+      it 'must be ec_public_key' do
+        generator.key_value = 'not EC public key'
+        is_expected.to dissatisfy_schema(schema, {keyValue: ['must be an EC public key']})
       end
     end
   end
+end
 
-  context 'ECv2' do
-    let(:generator) { AliquotPay.new(:ECv2) }
-    let(:token)     { generator.token }
+shared_examples 'ECv2 PaymentMethodDetails' do
+
+  context 'IntermediateSigningKeySchema' do
+    let(:schema) { Aliquot::Validator::IntermediateSigningKeyContract.new }
+    let(:key)  { token['intermediateSigningKey'] }
     subject do
-      input
+      key
     end
-    include_examples 'Validator Spec'
 
-    context 'SignedKeySchema' do
-      let(:schema) { Aliquot::Validator::SignedKeySchema }
-      let(:input)  { generator.build_signed_key }
-
-      context 'keyExpiration' do
-        it 'must exist' do
-          input.delete('keyExpiration')
-          is_expected.to dissatisfy_schema(schema, {keyExpiration: ['is missing']})
-        end
-
-        it 'must be filled' do
-          input['keyExpiration'] = ''
-          is_expected.to dissatisfy_schema(schema, {keyExpiration: ['must be filled']})
-        end
-
-        it 'must be integer string' do
-          generator.key_expiration = 'not digits'
-          is_expected.to dissatisfy_schema(schema, {keyExpiration: ['must be string encoded integer']})
-        end
+    context 'signedKey' do
+      it 'must exist' do
+        token['intermediateSigningKey'].delete('signedKey')
+        is_expected.to dissatisfy_schema(schema, signedKey: ['is missing'])
       end
 
-      context 'keyValue' do
-        it 'must exist' do
-          input.delete('keyValue')
-          is_expected.to dissatisfy_schema(schema, {keyValue: ['is missing']})
-        end
+      it 'must be filled' do
+        token['intermediateSigningKey']['signedKey'] = ''
+        is_expected.to dissatisfy_schema(schema, signedKey: ['must be filled'])
+      end
 
-        it 'must be filled' do
-          input['keyValue'] = ''
-          is_expected.to dissatisfy_schema(schema, {keyValue: ['must be filled']})
-        end
+      it 'must be a string' do
+        generator.signed_key_string = 122
+        is_expected.to dissatisfy_schema(schema, signedKey: ['must be a string'])
+      end
 
-        it 'must be ec_public_key' do
-          generator.key_value = 'not EC public key'
-          is_expected.to dissatisfy_schema(schema, {keyValue: ['must be an EC public key']})
-        end
+      # CB: Not sure how to trigger this test as JSON.parse has changed since 2.3
+      #     see https://clearhaus.slack.com/archives/C3LG75WE9/p1661940442665459
+      it 'must be valid json'
+
+      it 'must pass' do
+
+        expect(JSON.parse(key.to_json, symbolize_names: false)).to satisfy_schema(schema)
       end
     end
 
-    context 'IntermediateSigningKeySchema' do
-      let(:schema) { Aliquot::Validator::IntermediateSigningKeySchema }
-      let(:input)  { token['intermediateSigningKey'] }
-
-      context 'signedKey' do
-        it 'must exist' do
-          token['intermediateSigningKey'].delete('signedKey')
-          is_expected.to dissatisfy_schema(schema, signedKey: ['is missing'])
-        end
-
-        it 'must be filled' do
-          token['intermediateSigningKey']['signedKey'] = ''
-          is_expected.to dissatisfy_schema(schema, signedKey: ['must be filled'])
-        end
-
-        it 'must be a string' do
-          generator.signed_key_string = 122
-          is_expected.to dissatisfy_schema(schema, signedKey: ['must be a string'])
-        end
-
-        # CB: Not sure how to trigger this test as JSON.parse has changed since 2.3
-        #     see https://clearhaus.slack.com/archives/C3LG75WE9/p1661940442665459
-        it 'must be valid json'
-
-        it 'must pass' do
-          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
-        end
+    context 'signatures' do
+      it 'must exist' do
+        token['intermediateSigningKey'].delete('signatures')
+        is_expected.to dissatisfy_schema(schema, signatures: ['is missing'])
       end
 
-      context 'signatures' do
-        it 'must exist' do
-          input.delete('signatures')
-          is_expected.to dissatisfy_schema(schema, signatures: ['is missing'])
-        end
+      it 'must be filled' do
+        generator.signatures = ''
+        is_expected.to dissatisfy_schema(schema, signatures: ['must be an array'])
+      end
 
-        it 'must be filled' do
-          generator.signatures = ''
-          is_expected.to dissatisfy_schema(schema, signatures: ['must be an array'])
-        end
+      it 'must be an array' do
+        generator.signatures = 'Not an array'
+        is_expected.to dissatisfy_schema(schema, signatures: ['must be an array'])
+      end
 
-        it 'must be an array' do
-          generator.signatures = 'Not an array'
-          is_expected.to dissatisfy_schema(schema, signatures: ['must be an array'])
-        end
+      it 'entries must be base64' do
+        generator.signatures = ['Not base64']
+        is_expected.to dissatisfy_schema(schema, signatures: {0 => ['must be Base64']})
+      end
 
-        it 'entries must be base64' do
-          generator.signatures = ['Not base64']
-          is_expected.to dissatisfy_schema(schema, signatures: {0 => ['must be Base64']})
-        end
+      it 'entries must be asn1' do
+        generator.signatures = ['Not base64']
+        is_expected.to dissatisfy_schema(schema, signatures: {0 => ['must be Base64']})
+      end
 
-        it 'entries must be asn1' do
-          generator.signatures = ['Not base64']
-          is_expected.to dissatisfy_schema(schema, signatures: {0 => ['must be Base64']})
-        end
-
-        it 'must pass' do
-          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
-        end
+      it 'must pass' do
+        expect(JSON.parse(key.to_json, symbolize_names: false)).to satisfy_schema(schema)
       end
     end
 
     context 'intermediateSigningKey' do
-      let(:schema) { Aliquot::Validator::TokenSchema }
-      let(:input)  { token }
+      let(:schema) { Aliquot::Validator::TokenContract.new }
+      subject do
+        token
+      end
 
       it 'must exist' do
         token.delete('intermediateSigningKey')
@@ -498,6 +322,278 @@ describe Aliquot::Validator do
       it 'must be a JSON object' do
         generator.intermediate_signing_key = 'Not a JSON object'
         is_expected.to dissatisfy_schema(schema, {intermediateSigningKey: ['must be a hash']})
+      end
+    end
+  end
+end
+
+shared_examples 'CommonPaymentMethodDetailsContract' do
+  context 'PaymentMethodDetailsSchema' do
+    let(:token)  { generator.build_payment_method_details }
+
+    it 'must be filled' do
+      generator.pan = ''
+      is_expected.to dissatisfy_schema(schema, {pan: ['must be filled']})
+    end
+
+    it 'must be integer string' do
+      generator.pan = 'no integers here'
+      is_expected.to dissatisfy_schema(schema, {pan: ['must be string encoded integer', 'must be a PAN']})
+    end
+
+    it 'must be a pan' do
+      generator.pan = '1121412908091872401284'
+      is_expected.to dissatisfy_schema(schema, {pan: ['must be a PAN']})
+    end
+  end
+
+  context 'expirationMonth' do
+    it 'must exist' do
+      token.delete('expirationMonth')
+      is_expected.to dissatisfy_schema(schema, {expirationMonth: ['is missing']})
+    end
+
+    it 'must be filled' do
+      generator.expiration_month = ''
+      is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be filled']})
+    end
+
+    it 'must be an integer' do
+      generator.expiration_month = 'a string'
+      is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be an integer']})
+    end
+
+    it 'must be a month' do
+      generator.expiration_month = 13
+      is_expected.to dissatisfy_schema(schema, {expirationMonth: ['must be a month (1..12)']})
+    end
+  end
+
+  context 'expirationYear' do
+    it 'must exist' do
+      token.delete('expirationYear')
+      is_expected.to dissatisfy_schema(schema, {expirationYear: ['is missing']})
+    end
+
+    it 'must be filled' do
+      generator.expiration_year = ''
+      is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be filled']})
+    end
+
+    it 'must be an integer' do
+      generator.expiration_year = 'a string'
+      is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be an integer']})
+    end
+
+    it 'must be a year' do
+      generator.expiration_year = 19993
+      is_expected.to dissatisfy_schema(schema, {expirationYear: ['must be a year (2000..3000)']})
+    end
+  end
+
+  context 'authMethod' do
+    it 'must exist' do
+      token.delete('authMethod')
+      is_expected.to dissatisfy_schema(schema, {authMethod: ['is missing']})
+    end
+
+    it 'must be filled' do
+      generator.auth_method = ''
+      is_expected.to dissatisfy_schema(schema, {authMethod: ['must be filled']})
+    end
+
+    it 'must be a string' do
+      generator.auth_method = 123
+      is_expected.to dissatisfy_schema(schema, {authMethod: ['must be a string']})
+    end
+
+    it 'must be PAN_ONLY, CRYPTOGRAM_3DS' do
+      generator.auth_method = 'INVALID_AUTH_METHOD'
+      is_expected.to dissatisfy_schema(schema, {authMethod: ['must be one of: PAN_ONLY, CRYPTOGRAM_3DS, 3DS']})
+    end
+  end
+
+  context 'cryptogram' do
+    context 'when PAN_ONLY' do
+      it 'must not exist' do
+        token['cryptogram'] = '05'
+        is_expected.to dissatisfy_schema(schema, {cryptogram: ['cannot be defined']})
+      end
+    end
+
+    context 'when CRYPTOGRAM_3DS' do
+      before(:each) { generator.auth_method = 'CRYPTOGRAM_3DS' }
+
+      it 'must exist' do
+        token.delete('cryptogram')
+        is_expected.to dissatisfy_schema(schema, {cryptogram: ['is missing']})
+      end
+
+      it 'must be filled' do
+        generator.cryptogram = ''
+        is_expected.to dissatisfy_schema(schema, {cryptogram: ['must be filled']})
+      end
+
+      it 'must be a string' do
+        generator.cryptogram = 123
+        is_expected.to dissatisfy_schema(schema, {cryptogram: ['must be a string']})
+      end
+    end
+  end
+
+  context 'eciIndicator' do
+    context 'when PAN_ONLY' do
+      it 'must not exist' do
+        token['eciIndicator'] = '05'
+        is_expected.to dissatisfy_schema(schema, {eciIndicator: ['cannot be defined']})
+      end
+    end
+
+    context 'when CRYPTOGRAM_3DS' do
+      before(:each) { generator.auth_method = 'CRYPTOGRAM_3DS' }
+
+      it 'is not required' do
+        token.delete('eciIndicator')
+        expect(JSON.parse(token.to_json, symbolize_names: false)).to satisfy_schema(schema)
+      end
+
+      it 'must be a string' do
+        generator.eci_indicator = 123
+        is_expected.to dissatisfy_schema(schema, {eciIndicator: ['must be a string']})
+      end
+
+      it 'must be an ECI' do
+        generator.eci_indicator = 'ff'
+        is_expected.to dissatisfy_schema(schema, {eciIndicator: ['must be an ECI']})
+      end
+    end
+  end
+end
+
+describe Aliquot::Validator do
+  describe 'ECv1' do
+    subject do
+      token
+    end
+    describe 'non-tokenized' do
+      let(:schema) { Aliquot::Validator::ECv1_PaymentMethodDetailsContract.new }
+      let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
+      let(:token)     { generator.token }
+      include_examples 'Validator Spec'
+
+      context 'pan' do
+        it 'must exist' do
+          token.delete('pan')
+          is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
+        end
+      end
+
+      context 'paymentMethod' do
+        let(:token)  { generator.build_cleartext_message }
+        let(:schema) { Aliquot::Validator::EncryptedMessageContract.new }
+          it 'must be CARD for everything but tokenized ECv1' do
+            generator.payment_method = 'RANDOM'
+            is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be equal to CARD']})
+          end
+      end
+
+      context 'intermediateSigningKey' do
+        let(:schema) { Aliquot::Validator::TokenContract.new }
+        let(:input)  { token }
+
+        it 'should not be enforced' do
+          token.delete('intermediateSigningKey')
+          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
+        end
+      end
+    end
+
+    describe 'tokenized' do
+      let(:schema) { Aliquot::Validator::ECv1_TokenizedPaymentMethodDetailsContract.new }
+      let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :app) }
+      let(:token)     { generator.token }
+      include_examples 'Validator Spec'
+
+      context 'dpan' do
+        it 'must exist' do
+          token.delete('dpan')
+          is_expected.to dissatisfy_schema(schema, {dpan: ['is missing']})
+        end
+      end
+
+      context 'paymentMethod' do
+        let(:token)  { generator.build_cleartext_message }
+        let(:schema) { Aliquot::Validator::EncryptedMessageContract.new }
+        it 'must be TOKENIZED_CARD for tokenized ECv1' do
+          generator.payment_method = 'RANDOM'
+          generator.auth_method = '3DS'
+          token['protocolVersion'] = 'ECv1'
+          is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be equal to TOKENIZED_CARD']})
+        end
+      end
+
+      context 'intermediateSigningKey' do
+        let(:schema) { Aliquot::Validator::TokenContract.new }
+        let(:input)  { token }
+
+        it 'should not be enforced' do
+          token.delete('intermediateSigningKey')
+          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
+        end
+      end
+    end
+  end
+
+  context 'ECv2' do
+    subject do
+      token
+    end
+    context 'non-tokenized' do
+      let(:schema) { Aliquot::Validator::ECv2_PaymentMethodDetailsContract.new }
+      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
+      let(:token)     { generator.token }
+      include_examples 'Validator Spec'
+      include_examples 'ECv2 PaymentMethodDetails'
+
+      context 'pan' do
+        it 'must exist' do
+          token.delete('pan')
+          is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
+        end
+      end
+
+      context 'paymentMethod' do
+        let(:token)  { generator.build_cleartext_message }
+        let(:schema) { Aliquot::Validator::EncryptedMessageContract.new }
+          it 'must be CARD for everything but tokenized ECv1' do
+            generator.payment_method = 'RANDOM'
+            is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be equal to CARD']})
+          end
+      end
+    end
+
+
+    context 'tokenized' do
+      let(:schema) { Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new }
+      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
+      let(:token)     { generator.token }
+      # include_examples 'Validator Spec'
+      include_examples 'ECv2 PaymentMethodDetails'
+
+      context 'pan' do
+        it 'must exist' do
+          token.delete('pan')
+          is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
+        end
+      end
+
+      context 'paymentMethod' do
+        let(:token)  { generator.build_cleartext_message }
+        let(:schema) { Aliquot::Validator::EncryptedMessageContract.new }
+          it 'must be CARD for everything but tokenized ECv1' do
+            generator.payment_method = 'RANDOM'
+            is_expected.to dissatisfy_schema(schema, {paymentMethod: ['must be equal to CARD']})
+          end
       end
     end
   end
