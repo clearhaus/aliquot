@@ -143,7 +143,7 @@ module Aliquot
       rule(:signedMessage).validate(:json?)
 
       rule(:intermediateSigningKey) do
-        key.failure('is missing') if 'ECv2'.eql?(values[:protocolVersion]) &&
+        key.failure('is missing') if values[:protocolVersion] == 'ECv2' &&
                                      values[:intermediateSigningKey].nil?
       end
     end
@@ -224,28 +224,26 @@ module Aliquot
       rule(:messageExpiration).validate(:integer_string?)
 
       rule(:paymentMethodDetails).validate do
-        contract = nil
-        if 'ECv1'.eql?(values[:protocolVersion])
-          if 'TOKENIZED_CARD'.eql?(values[:paymentMethod])
-            contract = ECv1_TokenizedPaymentMethodDetailsContract.new
+        if values[:protocolVersion] == 'ECv1'
+          if values[:paymentMethod] == 'TOKENIZED_CARD'
+            return ECv1_TokenizedPaymentMethodDetailsContract.new
           else
-            contract = ECv1_PaymentMethodDetailsContract.new
+            return ECv1_PaymentMethodDetailsContract.new
           end
         else
-          if 'CRYPTOGRAM_3DS'.eql?(values[:authMethod])
-            contract = ECv2_TokenizedPaymentMethodDetailsContract.new
+          if  values[:authMethod] == 'CRYPTOGRAM_3DS'
+            return ECv2_TokenizedPaymentMethodDetailsContract.new
           else
-            contract = ECv2_PaymentMethodDetailsContract.new
+            return ECv2_PaymentMethodDetailsContract.new
           end
         end
-        contract
       end
       rule(:paymentMethod) do
         if values[:paymentMethodDetails] && values[:paymentMethodDetails].is_a?(Hash)
           if '3DS'.eql?(values[:paymentMethodDetails] && values[:paymentMethodDetails]['authMethod']) # Tokenized ECv1
-            key.failure('must be equal to TOKENIZED_CARD') unless 'TOKENIZED_CARD'.eql?(value)
+            key.failure('must be equal to TOKENIZED_CARD') unless value == 'TOKENIZED_CARD'
           else
-            key.failure('must be equal to CARD') unless 'CARD'.eql?(value)
+            key.failure('must be equal to CARD') unless value == 'CARD'
           end
         end
       end
