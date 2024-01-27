@@ -229,7 +229,7 @@ module Aliquot
           if 'TOKENIZED_CARD'.eql?(values[:paymentMethod])
             contract = ECv1_TokenizedPaymentMethodDetailsContract.new
           else
-            contract =  ECv1_PaymentMethodDetailsContract.new
+            contract = ECv1_PaymentMethodDetailsContract.new
           end
         else
           if 'CRYPTOGRAM_3DS'.eql?(values[:authMethod])
