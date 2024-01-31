@@ -29,8 +29,8 @@ shared_examples 'all protocol versions' do
   #     see https://clearhaus.slack.com/archives/C3LG75WE9/p1661940442665459
   it 'rejects invalid encryptedMessage JSON gracefully'
 
-  # KSE: Can this be triggered?
-  it 'fails decryption gracefully'
+  # # KSE: Can this be triggered?
+  # it 'fails decryption gracefully'
 
   it 'rejects expired token' do
     generator.message_expiration = (Time.now.to_f - 20).round.to_s
