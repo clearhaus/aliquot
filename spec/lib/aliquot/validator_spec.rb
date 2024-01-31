@@ -577,7 +577,7 @@ describe Aliquot::Validator do
       let(:schema) { Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new }
       let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
       let(:token)     { generator.token }
-      # include_examples 'Validator Spec'
+      include_examples 'Validator Spec'
       include_examples 'ECv2 PaymentMethodDetails'
 
       context 'pan' do
