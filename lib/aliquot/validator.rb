@@ -169,7 +169,7 @@ module Aliquot
       rule(:expirationYear).validate(:year?)
     end
 
-    class ECv1_PaymentMethodDetailsContract < Dry::Validation::Contract
+    class ECv1_PaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
       json(CommonPaymentMethodDetailsContract.schema) do
         required(:pan).filled(:str?)
       end
@@ -177,7 +177,7 @@ module Aliquot
       rule(:pan).validate(:integer_string?, :pan?)
     end
 
-    class ECv1_TokenizedPaymentMethodDetailsContract < Dry::Validation::Contract
+    class ECv1_TokenizedPaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
       json(CommonPaymentMethodDetailsContract.schema) do
         required(:dpan).filled(:str?)
         required(:threedsCryptogram).filled(:str?)
@@ -189,7 +189,7 @@ module Aliquot
       rule(:eciIndicator).validate(:eci?)
     end
 
-    class ECv2_PaymentMethodDetailsContract < Dry::Validation::Contract
+    class ECv2_PaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
       json(CommonPaymentMethodDetailsContract.schema) do
         required(:pan).filled(:str?)
         required(:authMethod).filled(:str?, included_in?: %w[PAN_ONLY])
@@ -198,7 +198,7 @@ module Aliquot
       rule(:pan).validate(:integer_string?, :pan?)
     end
 
-    class ECv2_TokenizedPaymentMethodDetailsContract < Dry::Validation::Contract
+    class ECv2_TokenizedPaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
       json(CommonPaymentMethodDetailsContract.schema) do
         required(:pan).filled(:str?)
         required(:cryptogram).filled(:str?)
@@ -209,8 +209,6 @@ module Aliquot
       rule(:pan).validate(:integer_string?, :pan?)
       rule(:eciIndicator).validate(:eci?)
     end
-
-    # PaymentMethodDetailsSchema = PaymentMethodDetailsContract.new
 
     # DRY-Validation schema for encryptedMessage component Google Pay token
     class EncryptedMessageContract < Dry::Validation::Contract
@@ -224,20 +222,23 @@ module Aliquot
       rule(:messageExpiration).validate(:integer_string?)
 
       rule(:paymentMethodDetails).validate do
+        contract =
         if values[:protocolVersion] == 'ECv1'
           if values[:paymentMethod] == 'TOKENIZED_CARD'
-            return ECv1_TokenizedPaymentMethodDetailsContract.new
+             ECv1_TokenizedPaymentMethodDetailsContract.new
           else
-            return ECv1_PaymentMethodDetailsContract.new
+             ECv1_PaymentMethodDetailsContract.new
           end
         else
           if  values[:authMethod] == 'CRYPTOGRAM_3DS'
-            return ECv2_TokenizedPaymentMethodDetailsContract.new
+             ECv2_TokenizedPaymentMethodDetailsContract.new
           else
-            return ECv2_PaymentMethodDetailsContract.new
+             ECv2_PaymentMethodDetailsContract.new
           end
         end
+        contract.call(values[:paymentMethodDetails])
       end
+
       rule(:paymentMethod) do
         if values[:paymentMethodDetails] && values[:paymentMethodDetails].is_a?(Hash)
           if '3DS'.eql?(values[:paymentMethodDetails] && values[:paymentMethodDetails]['authMethod']) # Tokenized ECv1
@@ -314,6 +315,31 @@ module Aliquot
       def initialize(input)
         @input = input
         @schema = EncryptedMessageContract.new
+      end
+    end
+
+    # Class for validating the encryptedMessage component of a Google Pay token
+    class PaymentMethodDetailsValidator
+      include InstanceMethods
+
+      class Error < ::Aliquot::Error; end
+
+      def initialize(input, version, tokenized)
+        @input = input
+        @schema =
+        if version == 'ECv1'
+          if tokenized
+            Aliquot::Validator::ECv1_TokenizedPaymentMethodDetailsContract.new
+          else
+            Aliquot::Validator::ECv1_PaymentMethodDetailsContract.new
+          end
+        else
+          if tokenized
+            Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new
+          else
+            Aliquot::Validator::ECv2_PaymentMethodDetailsContract.new
+          end
+        end
       end
     end
 

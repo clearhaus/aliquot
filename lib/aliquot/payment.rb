@@ -66,13 +66,15 @@ module Aliquot
 
       begin
         @message = JSON.parse(decrypt(aes_key, @signed_message[:encryptedMessage]))
-        @message.merge!('threedsCryptogram' => @message.delete('3dsCryptogram')) if @message['3dsCryptogram']
-        @message
+
+        @message["paymentMethodDetails"].transform_keys!('3dsCryptogram' => 'threedsCryptogram' ) if
+          @message['paymentMethodDetails']['3dsCryptogram']
       rescue JSON::JSONError => e
         raise InputError, "encryptedMessage JSON is invalid, #{e.message}"
       rescue => e
         raise DecryptionError, "decryption failed, #{e.message}"
       end
+
 
       @message = validate_message
 
@@ -223,7 +225,20 @@ module Aliquot
       validator.validate
 
       # Output is hashed with symbolized keys.
-      validator.output
+      message_hash = validator.output
+
+      payment_method_details_message = message_hash[:paymentMethodDetails]
+      message_details_validator =
+        if message_hash[:paymentMethod] == 'TOKENIZED_CARD' ||
+           message_hash[:paymentMethodDetails]['authMethod'] == 'CRYPTOGRAM_3DS'
+          Aliquot::Validator::PaymentMethodDetailsValidator.new(payment_method_details_message, protocol_version, true)
+        else
+          Aliquot::Validator::PaymentMethodDetailsValidator.new(payment_method_details_message, protocol_version, false)
+        end
+      message_details_validator.validate
+      message_hash[:paymentMethodDetails] = message_details_validator.output
+
+      message_hash
     end
 
     ##

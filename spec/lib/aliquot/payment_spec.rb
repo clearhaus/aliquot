@@ -98,7 +98,6 @@ shared_examples 'only ECv2' do
 end
 
 describe Aliquot::Payment do
-  let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
   subject do
     -> do Aliquot::Payment.new(generator.token.to_json,
                                generator.shared_secret,
@@ -111,22 +110,23 @@ describe Aliquot::Payment do
   context 'ECv1' do
     context 'non-tokenized' do
       let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
-      let(:token) { generator.token }
 
       include_examples 'all protocol versions'
+
       it 'decrypts with PAN_ONLY' do
         expect { subject.call }.to_not raise_error
-        expect(subject.call[:paymentMethodDetails]).to_not include('authMethod' => 'PAN_ONLY')
+        expect(subject.call[:paymentMethodDetails]).to_not include(:authMethod => 'PAN_ONLY')
       end
     end
+
     context 'tokenized' do
       let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :app) }
-      let(:token) { generator.token }
 
       include_examples 'all protocol versions'
+
       it 'decrypts with 3DS' do
         expect { subject.call }.to_not raise_error
-        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => '3DS')
+        expect(subject.call[:paymentMethodDetails]).to include(:authMethod => '3DS')
       end
     end
   end
@@ -138,20 +138,23 @@ describe Aliquot::Payment do
 
       include_examples 'all protocol versions'
       include_examples 'only ECv2'
+
       it 'decrypts' do
         expect { subject.call }.to_not raise_error
-        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => 'PAN_ONLY')
+        expect(subject.call[:paymentMethodDetails]).to include(:authMethod => 'PAN_ONLY')
       end
     end
+
     context 'tokenized' do
       let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :app) }
       let(:token) { generator.token }
 
       include_examples 'all protocol versions'
       include_examples 'only ECv2'
+
       it 'decrypts' do
         expect { subject.call }.to_not raise_error
-        expect(subject.call[:paymentMethodDetails]).to include('authMethod' => 'CRYPTOGRAM_3DS')
+        expect(subject.call[:paymentMethodDetails]).to include(:authMethod => 'CRYPTOGRAM_3DS')
       end
     end
   end
