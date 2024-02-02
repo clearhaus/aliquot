@@ -243,10 +243,9 @@ shared_examples 'Validator Spec' do
 end
 
 shared_examples 'ECv2 PaymentMethodDetails' do
-
   context 'IntermediateSigningKeySchema' do
     let(:schema) { Aliquot::Validator::IntermediateSigningKeyContract.new }
-    let(:key)  { token['intermediateSigningKey'] }
+    let(:key)    { token['intermediateSigningKey'] }
     subject do
       key
     end
@@ -272,7 +271,6 @@ shared_examples 'ECv2 PaymentMethodDetails' do
       it 'must be valid json'
 
       it 'must pass' do
-
         expect(JSON.parse(key.to_json, symbolize_names: false)).to satisfy_schema(schema)
       end
     end
@@ -476,13 +474,15 @@ describe Aliquot::Validator do
       token
     end
     describe 'non-tokenized' do
-      let(:schema) { Aliquot::Validator::ECv1_PaymentMethodDetailsContract.new }
       let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
       let(:token)     { generator.token }
       include_examples 'Validator Spec'
 
       context 'pan' do
+        let(:schema) { Aliquot::Validator::ECv1_PaymentMethodDetailsContract.new }
+        let(:token)  { generator.build_cleartext_message['paymentMethodDetails'] }
         it 'must exist' do
+          token.merge!('threedsCryptogram' => token.delete('3dsCryptogram'))
           token.delete('pan')
           is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
         end
@@ -509,13 +509,15 @@ describe Aliquot::Validator do
     end
 
     describe 'tokenized' do
-      let(:schema) { Aliquot::Validator::ECv1_TokenizedPaymentMethodDetailsContract.new }
       let(:generator) { AliquotPay.new(protocol_version: :ECv1, type: :app) }
       let(:token)     { generator.token }
       include_examples 'Validator Spec'
 
       context 'dpan' do
+        let(:schema) { Aliquot::Validator::ECv1_TokenizedPaymentMethodDetailsContract.new }
+        let(:token)  { generator.build_cleartext_message['paymentMethodDetails'] }
         it 'must exist' do
+          token.merge!('threedsCryptogram' => token.delete('3dsCryptogram'))
           token.delete('dpan')
           is_expected.to dissatisfy_schema(schema, {dpan: ['is missing']})
         end
@@ -534,11 +536,10 @@ describe Aliquot::Validator do
 
       context 'intermediateSigningKey' do
         let(:schema) { Aliquot::Validator::TokenContract.new }
-        let(:input)  { token }
 
         it 'should not be enforced' do
           token.delete('intermediateSigningKey')
-          expect(JSON.parse(input.to_json, symbolize_names: false)).to satisfy_schema(schema)
+          expect(JSON.parse(token.to_json, symbolize_names: false)).to satisfy_schema(schema)
         end
       end
     end
@@ -549,14 +550,16 @@ describe Aliquot::Validator do
       token
     end
     context 'non-tokenized' do
-      let(:schema) { Aliquot::Validator::ECv2_PaymentMethodDetailsContract.new }
       let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
       let(:token)     { generator.token }
       include_examples 'Validator Spec'
       include_examples 'ECv2 PaymentMethodDetails'
 
       context 'pan' do
+        let(:schema) { Aliquot::Validator::ECv2_PaymentMethodDetailsContract.new }
+        let(:token)  { generator.build_cleartext_message['paymentMethodDetails'] }
         it 'must exist' do
+          token.merge!('threedsCryptogram' => token.delete('3dsCryptogram'))
           token.delete('pan')
           is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
         end
@@ -572,16 +575,17 @@ describe Aliquot::Validator do
       end
     end
 
-
     context 'tokenized' do
-      let(:schema) { Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new }
-      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
+      let(:generator) { AliquotPay.new(protocol_version: :ECv2, type: :app) }
       let(:token)     { generator.token }
       include_examples 'Validator Spec'
       include_examples 'ECv2 PaymentMethodDetails'
 
       context 'pan' do
+        let(:schema) { Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new }
+        let(:token)  { generator.build_cleartext_message['paymentMethodDetails'] }
         it 'must exist' do
+          token.merge!('threedsCryptogram' => token.delete('3dsCryptogram'))
           token.delete('pan')
           is_expected.to dissatisfy_schema(schema, {pan: ['is missing']})
         end
