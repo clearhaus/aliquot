@@ -66,15 +66,14 @@ module Aliquot
 
       begin
         @message = JSON.parse(decrypt(aes_key, @signed_message[:encryptedMessage]))
-        @message["paymentMethodDetails"].merge!(
-          'threedsCryptogram' => @message["paymentMethodDetails"]
-          .delete('3dsCryptogram')) if @message["paymentMethodDetails"]['3dsCryptogram']
+        @message['paymentMethodDetails'].merge!(
+          'threedsCryptogram' => @message['paymentMethodDetails']
+          .delete('3dsCryptogram')) if @message['paymentMethodDetails']['3dsCryptogram']
       rescue JSON::JSONError => e
         raise InputError, "encryptedMessage JSON is invalid, #{e.message}"
       rescue => e
         raise DecryptionError, "decryption failed, #{e.message}"
       end
-
 
       @message = validate_message
 
