@@ -240,8 +240,8 @@ module Aliquot
       end
 
       rule(:paymentMethod) do
-        if values[:paymentMethodDetails] && values[:paymentMethodDetails].is_a?(Hash)
-          if '3DS'.eql?(values[:paymentMethodDetails] && values[:paymentMethodDetails]['authMethod']) # Tokenized ECv1
+        if values[:paymentMethodDetails].is_a?(Hash)
+          if '3DS'.eql?(values[:paymentMethodDetails]['authMethod']) # Tokenized ECv1
             key.failure('must be equal to TOKENIZED_CARD') unless value == 'TOKENIZED_CARD'
           else
             key.failure('must be equal to CARD') unless value == 'CARD'
