@@ -47,13 +47,13 @@ describe Aliquot::Payment do
   end
 
   context :ECv1 do
-    let (:generator) { AliquotPay.new(:ECv1) }
+    let (:generator) { AliquotPay.new(protocol_version: :ECv1, type: :browser) }
 
     include_examples 'common integration tests'
   end
 
   context :ECv2 do
-    let (:generator) { AliquotPay.new(:ECv2) }
+    let (:generator) { AliquotPay.new(protocol_version: :ECv2, type: :browser) }
 
     include_examples 'common integration tests'
 

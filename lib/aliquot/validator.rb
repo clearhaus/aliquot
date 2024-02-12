@@ -21,8 +21,8 @@ module Aliquot
       base64_asn1?:    'must be base64-encoded ANS.1 value',
       json?:           'must be valid JSON',
 
-      is_authMethodCryptogram3DS: 'authMethod CRYPTOGRAM_3DS requires eciIndicator',
-      is_authMethodCard:          'eciIndicator/cryptogram must be omitted when PAN_ONLY',
+      is_authMethodCryptogram3DS: 'authMethod CRYPTOGRAM_3DS or 3DS requires eciIndicator',
+      is_authMethodCard:          'eciIndicator/cryptogram/3dsCryptogram must be omitted when PAN_ONLY',
     }.freeze
 
     def self.base64_check(value)
@@ -118,8 +118,6 @@ module Aliquot
       rule(:keyValue).validate(:ec_public_key?)
     end
 
-    SignedKeySchema = SignedKeyContract.new
-
     # Schema used for the 'intermediateSigningKey' hash included in ECv2.
     class IntermediateSigningKeyContract < Dry::Validation::Contract
       json do
@@ -129,11 +127,9 @@ module Aliquot
       rule(:signedKey).validate(:json?)
       rule(:signatures).each do
         key.failure('must be Base64') unless Aliquot::Validator.base64_check(value) &&
-          Aliquot::Validator.ans1_check(value)
+                                             Aliquot::Validator.ans1_check(value)
       end
     end
-
-    IntermediateSigningKeySchema = IntermediateSigningKeyContract.new
 
     # DRY-Validation schema for Google Pay token
     class TokenContract < Dry::Validation::Contract
@@ -147,12 +143,10 @@ module Aliquot
       rule(:signedMessage).validate(:json?)
 
       rule(:intermediateSigningKey) do
-        key.failure('is missing') if 'ECv2'.eql?(values[:protocolVersion]) &&
-          values[:intermediateSigningKey].nil?
+        key.failure('is missing') if values[:protocolVersion] == 'ECv2' &&
+                                     values[:intermediateSigningKey].nil?
       end
     end
-
-    TokenSchema = TokenContract.new
 
     # DRY-Validation schema for signedMessage component Google Pay token
     class SignedMessageContract < Dry::Validation::Contract
@@ -166,41 +160,55 @@ module Aliquot
       rule(:tag).validate(:base64?)
     end
 
-    SignedMessageSchema = SignedMessageContract.new
-
-    # DRY-Validation schema for paymentMethodDetails component Google Pay token
-    class PaymentMethodDetailsContract < Dry::Validation::Contract
+    class CommonPaymentMethodDetailsContract < Dry::Validation::Contract
       json do
-        required(:pan).filled(:str?)
         required(:expirationMonth).filled(:int?)
         required(:expirationYear).filled(:int?)
-        required(:authMethod).filled(:str?, included_in?: %w[PAN_ONLY CRYPTOGRAM_3DS])
-
-        optional(:cryptogram).filled(:str?)
-        optional(:eciIndicator).filled(:str?)
       end
-      rule(:pan).validate(:integer_string?, :pan?)
       rule(:expirationMonth).validate(:month?)
       rule(:expirationYear).validate(:year?)
-      rule(:eciIndicator).validate(:eci?)
-
-      rule(:cryptogram) do
-        key.failure('is missing') if 'CRYPTOGRAM_3DS'.eql?(values[:authMethod]) &&
-          values[:cryptogram].nil?
-      end
-
-      rule(:cryptogram) do
-        key.failure('cannot be defined') if 'PAN_ONLY'.eql?(values[:authMethod]) &&
-          !values[:cryptogram].nil?
-      end
-
-      rule(:eciIndicator) do
-        key.failure('cannot be defined') if 'PAN_ONLY'.eql?(values[:authMethod]) &&
-          !values[:eciIndicator].nil?
-      end
     end
 
-    PaymentMethodDetailsSchema = PaymentMethodDetailsContract.new
+    class ECv1_PaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
+      json(CommonPaymentMethodDetailsContract.schema) do
+        required(:pan).filled(:str?)
+      end
+
+      rule(:pan).validate(:integer_string?, :pan?)
+    end
+
+    class ECv1_TokenizedPaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
+      json(CommonPaymentMethodDetailsContract.schema) do
+        required(:dpan).filled(:str?)
+        required(:threedsCryptogram).filled(:str?)
+        required(:eciIndicator).filled(:str?)
+        required(:authMethod).filled(:str?, included_in?: %w[3DS])
+      end
+
+      rule(:dpan).validate(:integer_string?, :pan?)
+      rule(:eciIndicator).validate(:eci?)
+    end
+
+    class ECv2_PaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
+      json(CommonPaymentMethodDetailsContract.schema) do
+        required(:pan).filled(:str?)
+        required(:authMethod).filled(:str?, included_in?: %w[PAN_ONLY])
+      end
+
+      rule(:pan).validate(:integer_string?, :pan?)
+    end
+
+    class ECv2_TokenizedPaymentMethodDetailsContract < CommonPaymentMethodDetailsContract
+      json(CommonPaymentMethodDetailsContract.schema) do
+        required(:pan).filled(:str?)
+        required(:cryptogram).filled(:str?)
+        required(:eciIndicator).filled(:str?)
+        required(:authMethod).filled(:str?, included_in?: %w[CRYPTOGRAM_3DS])
+      end
+
+      rule(:pan).validate(:integer_string?, :pan?)
+      rule(:eciIndicator).validate(:eci?)
+    end
 
     # DRY-Validation schema for encryptedMessage component Google Pay token
     class EncryptedMessageContract < Dry::Validation::Contract
@@ -208,16 +216,39 @@ module Aliquot
         required(:messageExpiration).filled(:str?)
         required(:messageId).filled(:str?)
         required(:paymentMethod).filled(:str?)
-        required(:paymentMethodDetails).filled(:hash).schema(PaymentMethodDetailsContract.schema)
+        required(:paymentMethodDetails).filled(:hash)
         optional(:gatewayMerchantId).filled(:str?)
       end
       rule(:messageExpiration).validate(:integer_string?)
+
+      rule(:paymentMethodDetails).validate do
+        contract =
+        if values[:protocolVersion] == 'ECv1'
+          if values[:paymentMethod] == 'TOKENIZED_CARD'
+             ECv1_TokenizedPaymentMethodDetailsContract.new
+          else
+             ECv1_PaymentMethodDetailsContract.new
+          end
+        else
+          if  values[:authMethod] == 'CRYPTOGRAM_3DS'
+             ECv2_TokenizedPaymentMethodDetailsContract.new
+          else
+             ECv2_PaymentMethodDetailsContract.new
+          end
+        end
+        contract.call(values[:paymentMethodDetails])
+      end
+
       rule(:paymentMethod) do
-        key.failure('must be equal to CARD') unless 'CARD'.eql?(value)
+        if values[:paymentMethodDetails].is_a?(Hash)
+          if '3DS'.eql?(values[:paymentMethodDetails]['authMethod']) # Tokenized ECv1
+            key.failure('must be equal to TOKENIZED_CARD') unless value == 'TOKENIZED_CARD'
+          else
+            key.failure('must be equal to CARD') unless value == 'CARD'
+          end
+        end
       end
     end
-
-    EncryptedMessageSchema = EncryptedMessageContract.new
 
     module InstanceMethods
       attr_reader :output
@@ -259,7 +290,7 @@ module Aliquot
 
       def initialize(input)
         @input = input
-        @schema = TokenSchema
+        @schema = TokenContract.new
       end
     end
 
@@ -271,7 +302,7 @@ module Aliquot
 
       def initialize(input)
         @input = input
-        @schema = SignedMessageSchema
+        @schema = SignedMessageContract.new
       end
     end
 
@@ -283,7 +314,32 @@ module Aliquot
 
       def initialize(input)
         @input = input
-        @schema = EncryptedMessageSchema
+        @schema = EncryptedMessageContract.new
+      end
+    end
+
+    # Class for validating the encryptedMessage component of a Google Pay token
+    class PaymentMethodDetailsValidator
+      include InstanceMethods
+
+      class Error < ::Aliquot::Error; end
+
+      def initialize(input, version, tokenized)
+        @input = input
+        @schema =
+        if version == 'ECv1'
+          if tokenized
+            Aliquot::Validator::ECv1_TokenizedPaymentMethodDetailsContract.new
+          else
+            Aliquot::Validator::ECv1_PaymentMethodDetailsContract.new
+          end
+        else
+          if tokenized
+            Aliquot::Validator::ECv2_TokenizedPaymentMethodDetailsContract.new
+          else
+            Aliquot::Validator::ECv2_PaymentMethodDetailsContract.new
+          end
+        end
       end
     end
 
@@ -294,7 +350,7 @@ module Aliquot
 
       def initialize(input)
         @input = input
-        @schema = SignedKeySchema
+        @schema = SignedKeyContract.new
       end
     end
   end

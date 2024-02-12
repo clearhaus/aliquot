@@ -29,12 +29,20 @@ RSpec::Matchers.define :dissatisfy_schema do |expected, mismatches|
 
     return false unless @errors.keys.include? mismatches.keys.first
 
+    @errors.keys.each do |error|
+      return false unless mismatches.keys.include? error
+    end
+
     @errors.values.each do |error|
       return false unless mismatches.values.include? error
     end
 
     mismatches.values.each do |mismatch|
       return false unless @errors.values.include? mismatch
+    end
+
+    mismatches.keys.each do |mismatch|
+      return false unless @errors.keys.include? mismatch
     end
 
     true
