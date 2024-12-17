@@ -6,9 +6,9 @@ metadata:
   description: Google Pay token handler/decrypter
   tags:
     - confidentiality:public
-    - integrity:integrity-neutral
-    - availability:standard
-    - pci-dss:no
+    - integrity:integrity-and-authenticity-critical
+    - availability:real-time-critical
+    - pci-dss:yes
 spec:
   type: library
   lifecycle: production
