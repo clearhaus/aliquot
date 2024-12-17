@@ -10,7 +10,7 @@ metadata:
     - availability:standard
     - pci-dss:no
 spec:
-  type: service
+  type: library
   lifecycle: production
   owner: AEP
   system: clearhaus
