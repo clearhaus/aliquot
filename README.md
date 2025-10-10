@@ -5,48 +5,18 @@
 
 ## Example usage ##
 
-For usage examples it's best to look at unit tests. As an example from `dummy_spec.rb`.
+To run sample_token_poc.rb
 
-```ruby
-# token_string::  Google Pay token (JSON string)
-# shared_secret:: Base64 encoded shared secret (EC Public key)
-# recipient_id::  Google Pay recipient ID ("<PREFIX e.g. merchant>:<SOMETHING>")
-a = Aliquot::Payment.new(token_string, shared_secret, recipient_id)
-a.process
 ```
-
-## Unit tests ##
-
-To be sure that unit tests run properly, you can run them in a Docker container.
-
-```bash
-docker run -ti --rm -v $(pwd):/opt/aliquot ruby:2.7.4 bash
-cd /opt/aliquot
-bundle install
-bundle exec rspec
-exit
+ruby -I lib sample_token_poc.rb
 ```
+The file ` sample_token_poc.rb` contains a GooglePay token for `gateway:epay` with gateway merchant id: `0123456789` created with [GooglePay token generator](https://developers.google.com/pay/api/processors/guides/test-and-validation/token-generator) and the calculated shared_secret - `googlepay[shared_key]` [mentioned here](https://docs.gateway.clearhaus.com/#authorizations). 
 
-## Publishing new Gem
+It uses the library to validate signatures and decrypts the token and dumps it to stdout. <br>
+The token is valid for a week as I remember.
 
-Beware of cyclic dependency with `aliquot-pay`. Update the new versions 
-for these gems in parallel.
+Minor changes in payment.rb - all related to preserving `\u003d` before various checks are calculated - as suggested here [GooglePay Developer Doc](https://developers.google.com/pay/api/processors/guides/implementation/verify-signatures#how-to-construct).<br>
+The code still contains a lot of dumps for debugging/understanding purposes - including complete token and (test) carddata :-O
 
-1. Update [./aliquot.gemspec](./aliquot.gemspec)
-    ```gemspec
-    Gem::Specification.new do |s|
-      s.name     = 'aliquot'
-      s.version  = '${NEW_ALIQUOT_VERSION}'
-      ...
-      s.add_development_dependency 'aliquot-pay', '~> ${NEW_ALIQUOT-PAY_VERSION}'
-      ...
-    end
-    ```
 
-2. Run the following
-    ```bash
-    gem build
-    gem push aliquot-${NEW_ALIQUOT_VERSION}.gem
-    ```
-
-3. Then do the same for `aliquot-pay` if not already done.
+I have not spent time on updating the unittest's - new to Ruby and especially the RSpec testing framework!

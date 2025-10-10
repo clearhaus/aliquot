@@ -57,7 +57,14 @@ module Aliquot
       @signed_message = validate_signed_message
 
       begin
-        aes_key, mac_key = derive_keys(@signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
+
+        ephemeral_public_key = @signed_message[:ephemeralPublicKey]
+        puts "ephemeral_public_key = #{ephemeral_public_key}"
+        original_ephemeral_public_key = ephemeral_public_key.gsub("=", "\\u003d")
+        puts "original_ephemeral_public_key = #{original_ephemeral_public_key}"
+
+        aes_key, mac_key = derive_keys(ephemeral_public_key, @shared_secret, 'Google')       
+        #aes_key, mac_key = derive_keys(@signed_message[:ephemeralPublicKey], @shared_secret, 'Google')
       rescue => e
         raise KeyDerivationError, "cannot derive keys, #{e.message}"
       end
@@ -65,7 +72,10 @@ module Aliquot
       raise InvalidMacError, 'MAC does not match' unless valid_mac?(mac_key)
 
       begin
-        @message = JSON.parse(decrypt(aes_key, @signed_message[:encryptedMessage]))
+        decrypted = decrypt(aes_key, @signed_message[:encryptedMessage])
+        puts "decrypted: #{decrypted}"
+
+        @message = JSON.parse(decrypted)        
         @message['paymentMethodDetails'].merge!(
           'threedsCryptogram' => @message['paymentMethodDetails']
           .delete('3dsCryptogram')) if @message['paymentMethodDetails']['3dsCryptogram']
@@ -122,15 +132,23 @@ module Aliquot
     end
 
     def check_signature
-      signed_string_message = ['Google', @recipient_id, protocol_version, @token[:signedMessage]].map do |str|
+
+      signed_message = @token[:signedMessage]
+      puts "signed_message: #{signed_message}"
+
+      original_signed_message = signed_message.gsub("=", "\\u003d")
+      puts "original_signed_message: #{original_signed_message}"
+
+      signed_string_message = ['Google', @recipient_id, protocol_version, original_signed_message].map do |str|
         [str.length].pack('V') + str
       end.join
       message_signature = Base64.strict_decode64(@token[:signature])
 
       root_signing_keys = root_keys
+      puts "root_signing_keys[0]: #{Base64.strict_encode64(root_signing_keys[0].to_der)}"
 
       case protocol_version
-      when 'ECv1'
+              when 'ECv1'
         # Check if signature was performed directly with any possible key.
         success =
           root_signing_keys.map do |key|
@@ -139,15 +157,22 @@ module Aliquot
 
         raise InvalidSignatureError, 'signature of signedMessage does not match' unless success
       when 'ECv2'
-        signed_key_signature = ['Google', 'ECv2', @token[:intermediateSigningKey][:signedKey]].map do |str|
+        signed_key = @token[:intermediateSigningKey][:signedKey]
+        original_signed_key = signed_key.gsub("=", "\\u003d")
+        signed_key_signature = ['Google', 'ECv2', original_signed_key].map do |str|
           [str.length].pack('V') + str
         end.join
 
         # Check that the intermediate key signed the message
         pkey = OpenSSL::PKey::EC.new(Base64.strict_decode64(@intermediate_key[:keyValue]))
+                       
+        puts "signed_string_message:"
+        puts hexdump(signed_string_message)
+        
         raise InvalidSignatureError, 'signature of signedMessage does not match' unless pkey.verify(new_digest, message_signature, signed_string_message)
 
         intermediate_signatures = @token[:intermediateSigningKey][:signatures]
+        puts "signed_key_signature: #{signed_key_signature}"        
 
         # Check that a root signing key signed the intermediate
         success = valid_intermediate_key_signatures?(
@@ -194,20 +219,22 @@ module Aliquot
 
       key_len = new_cipher.key_len
 
-      key_bytes = if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf)
-                    OpenSSL::KDF.hkdf(input_keying_material, hash: new_digest, salt: '', length: 2 * key_len, info: info)
-                  else
+      key_bytes = if OpenSSL.const_defined?(:KDF) && OpenSSL::KDF.respond_to?(:hkdf) 
+                    OpenSSL::KDF.hkdf(input_keying_material, hash: new_digest, salt: '', length: 2 * key_len, info: info)    
+                  else 
                     HKDF.new(input_keying_material, algorithm: 'SHA256', info: info).next_bytes(2 * key_len)
                   end
 
       [key_bytes[0..key_len - 1], key_bytes[key_len..2 * key_len]]
     end
 
-    def valid_mac?(mac_key)
+    def valid_mac?(mac_key)      
       data = Base64.strict_decode64(@signed_message[:encryptedMessage])
       tag = @signed_message[:tag]
+      original_tag = tag.gsub("=", "\\u003d")
       mac = OpenSSL::HMAC.digest(new_digest, mac_key, data)
 
+      compare(Base64.strict_encode64(mac), original_tag)
       compare(Base64.strict_encode64(mac), tag)
     end
 
@@ -273,5 +300,10 @@ module Aliquot
 
       diffs.zero?
     end
+
+    def hexdump(str)
+      str.bytes.map { |b| "%02x" % b }.join(' ')
+    end
+
   end
 end
