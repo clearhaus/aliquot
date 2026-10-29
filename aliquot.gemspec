@@ -14,6 +14,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 2.7'
 
+  s.add_runtime_dependency 'base64',         '~> 0.2'
   s.add_runtime_dependency 'dry-validation', '~> 1.8'
   s.add_runtime_dependency 'excon',          '~> 0.71.0'
   s.add_runtime_dependency 'hkdf',           '~> 0.3'
